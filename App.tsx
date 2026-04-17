@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { supabase } from './src/lib/supabase';
 import { useAuthStore } from './src/store/auth';
+import { AuthNavigator } from './src/features/auth/AuthNavigator';
+import { HomeScreen } from './src/features/home/HomeScreen';
 
 const queryClient = new QueryClient();
 
@@ -24,11 +26,8 @@ function AppContent() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Kin</Text>
-      <Text style={styles.subtitle}>
-        {user ? `Signed in as ${user.email}` : 'Caregiver coordination, simplified.'}
-      </Text>
       <StatusBar style="auto" />
+      {user ? <HomeScreen /> : <AuthNavigator />}
     </View>
   );
 }
@@ -45,18 +44,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9F7F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    letterSpacing: -1,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 8,
   },
 });
