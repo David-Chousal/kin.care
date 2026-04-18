@@ -8,8 +8,9 @@ import { CreateFamilyScreen } from '../family/CreateFamilyScreen';
 import { AcceptInviteScreen } from '../family/AcceptInviteScreen';
 import { MemberListScreen } from '../family/MemberListScreen';
 import { InviteMemberScreen } from '../family/InviteMemberScreen';
+import { TaskBoardScreen } from '../tasks/TaskBoardScreen';
 
-type ActiveView = 'dashboard' | 'members' | 'invite';
+type ActiveView = 'dashboard' | 'members' | 'invite' | 'tasks';
 
 export function HomeScreen() {
   const { user } = useAuthStore();
@@ -53,11 +54,18 @@ export function HomeScreen() {
     return <InviteMemberScreen onBack={() => setView('members')} />;
   }
 
+  if (view === 'tasks') {
+    return <TaskBoardScreen onBack={() => setView('dashboard')} />;
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{family.name}</Text>
       <Text style={styles.recipient}>Caring for {family.care_recipient_name}</Text>
       <Text style={styles.email}>{user?.email}</Text>
+      <TouchableOpacity style={styles.button} onPress={() => setView('tasks')}>
+        <Text style={styles.buttonText}>Tasks</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={() => setView('members')}>
         <Text style={styles.buttonText}>Members</Text>
       </TouchableOpacity>
