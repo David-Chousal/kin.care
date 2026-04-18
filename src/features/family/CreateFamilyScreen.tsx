@@ -13,7 +13,7 @@ import { useFamilyStore } from '../../store/family';
 import { Family } from '../../types';
 
 export function CreateFamilyScreen() {
-  const { user } = useAuthStore();
+  const { user, session } = useAuthStore();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
   const [familyName, setFamilyName] = useState('');

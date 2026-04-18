@@ -28,7 +28,7 @@
     },
     "extra": {
       "supabaseUrl": "https://toowcdabumseydziiodz.supabase.co",
-      "supabaseAnonKey": "sb_publishable_Y3R8hw_G_PJXQfgGhiIvjw_YFtKLO0I"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb3djZGFidW1zZXlkemlpb2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTQyNzUsImV4cCI6MjA5MjAzMDI3NX0.d962DRPOY-uYNwwXDC1K8RRBNntA0XS6xLe7MQWNz54"
     }
   }
 }
