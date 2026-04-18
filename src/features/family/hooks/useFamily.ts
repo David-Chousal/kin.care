@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/auth';
@@ -12,10 +13,7 @@ async function fetchFamilyForUser(userId: string): Promise<Family | null> {
     .limit(1)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
-    throw error;
-  }
-
+  if (error && error.code !== 'PGRST116') throw error;
   if (!data) return null;
 
   const families = data.families;
@@ -28,14 +26,16 @@ export function useFamily() {
   const { user } = useAuthStore();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
-  return useQuery<Family | null>({
+  const query = useQuery<Family | null>({
     queryKey: ['family', user?.id],
     queryFn: () => fetchFamilyForUser(user!.id),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,
-    select: (data) => {
-      setFamily(data);
-      return data;
-    },
   });
+
+  useEffect(() => {
+    if (query.data !== undefined) setFamily(query.data);
+  }, [query.data]);
+
+  return query;
 }
