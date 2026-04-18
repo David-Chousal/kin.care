@@ -1,12 +1,14 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
+import { useFamilyStore } from '../../store/family';
 import { useFamily } from '../family/hooks/useFamily';
 import { CreateFamilyScreen } from '../family/CreateFamilyScreen';
 
 export function HomeScreen() {
   const { user } = useAuthStore();
-  const { data: family, isLoading } = useFamily();
+  const { isLoading } = useFamily();
+  const family = useFamilyStore((s) => s.family);
 
   if (isLoading) {
     return (
