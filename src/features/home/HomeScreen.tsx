@@ -1,14 +1,22 @@
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
 import { useFamily } from '../family/hooks/useFamily';
 import { CreateFamilyScreen } from '../family/CreateFamilyScreen';
+import { AcceptInviteScreen } from '../family/AcceptInviteScreen';
+import { MemberListScreen } from '../family/MemberListScreen';
+import { InviteMemberScreen } from '../family/InviteMemberScreen';
+
+type ActiveView = 'dashboard' | 'members' | 'invite';
 
 export function HomeScreen() {
   const { user } = useAuthStore();
   const { isLoading } = useFamily();
   const family = useFamilyStore((s) => s.family);
+  const [view, setView] = useState<ActiveView>('dashboard');
+  const [showJoin, setShowJoin] = useState(false);
 
   if (isLoading) {
     return (
@@ -19,7 +27,30 @@ export function HomeScreen() {
   }
 
   if (!family) {
-    return <CreateFamilyScreen />;
+    if (showJoin) {
+      return <AcceptInviteScreen onBack={() => setShowJoin(false)} />;
+    }
+    return (
+      <View style={styles.noFamilyContainer}>
+        <CreateFamilyScreen />
+        <TouchableOpacity style={styles.joinLink} onPress={() => setShowJoin(true)}>
+          <Text style={styles.joinLinkText}>Have an invite code? Join instead</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (view === 'members') {
+    return (
+      <MemberListScreen
+        onInvite={() => setView('invite')}
+        onBack={() => setView('dashboard')}
+      />
+    );
+  }
+
+  if (view === 'invite') {
+    return <InviteMemberScreen onBack={() => setView('members')} />;
   }
 
   return (
@@ -27,8 +58,14 @@ export function HomeScreen() {
       <Text style={styles.title}>{family.name}</Text>
       <Text style={styles.recipient}>Caring for {family.care_recipient_name}</Text>
       <Text style={styles.email}>{user?.email}</Text>
-      <TouchableOpacity style={styles.button} onPress={() => supabase.auth.signOut()}>
-        <Text style={styles.buttonText}>Sign Out</Text>
+      <TouchableOpacity style={styles.button} onPress={() => setView('members')}>
+        <Text style={styles.buttonText}>Members</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, styles.buttonSecondary]}
+        onPress={() => supabase.auth.signOut()}
+      >
+        <Text style={styles.buttonTextSecondary}>Sign Out</Text>
       </TouchableOpacity>
     </View>
   );
@@ -40,6 +77,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9F7F4',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  noFamilyContainer: {
+    flex: 1,
+    backgroundColor: '#F9F7F4',
+  },
+  joinLink: {
+    alignItems: 'center',
+    paddingBottom: 40,
+    paddingTop: 8,
+  },
+  joinLinkText: {
+    fontSize: 15,
+    color: '#4F6BED',
+    fontWeight: '500',
   },
   container: {
     flex: 1,
@@ -71,10 +122,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 48,
     alignItems: 'center',
+    width: '100%',
+    marginBottom: 12,
+  },
+  buttonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  buttonTextSecondary: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
