@@ -1,13 +1,29 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
+import { useFamily } from '../family/hooks/useFamily';
+import { CreateFamilyScreen } from '../family/CreateFamilyScreen';
 
 export function HomeScreen() {
   const { user } = useAuthStore();
+  const { data: family, isLoading } = useFamily();
+
+  if (isLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4F6BED" />
+      </View>
+    );
+  }
+
+  if (!family) {
+    return <CreateFamilyScreen />;
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Kin</Text>
+      <Text style={styles.title}>{family.name}</Text>
+      <Text style={styles.recipient}>Caring for {family.care_recipient_name}</Text>
       <Text style={styles.email}>{user?.email}</Text>
       <TouchableOpacity style={styles.button} onPress={() => supabase.auth.signOut()}>
         <Text style={styles.buttonText}>Sign Out</Text>
@@ -17,6 +33,12 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  centered: {
+    flex: 1,
+    backgroundColor: '#F9F7F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F9F7F4',
@@ -25,14 +47,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   title: {
-    fontSize: 48,
+    fontSize: 32,
     fontWeight: '700',
     color: '#1A1A2E',
-    letterSpacing: -1,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  recipient: {
+    fontSize: 18,
+    color: '#4F6BED',
     marginBottom: 8,
   },
   email: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
     marginBottom: 40,
   },
