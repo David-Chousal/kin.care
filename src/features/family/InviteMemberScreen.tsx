@@ -23,7 +23,7 @@ export function InviteMemberScreen({ onBack }: Props) {
   const [role, setRole] = useState<UserRole>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successEmail, setSuccessEmail] = useState<string | null>(null);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
 
   async function handleSend() {
     if (!family) return;
@@ -36,19 +36,19 @@ export function InviteMemberScreen({ onBack }: Props) {
     setLoading(true);
     setError(null);
 
-    const { error: insertError } = await supabase.from('invitations').insert({
-      family_id: family.id,
-      email: trimmed,
-      role,
-    });
+    const { data, error: insertError } = await supabase
+      .from('invitations')
+      .insert({ family_id: family.id, email: trimmed, role })
+      .select('token')
+      .single();
 
-    if (insertError) {
-      setError(insertError.message);
+    if (insertError || !data) {
+      setError(insertError?.message ?? 'Failed to create invite.');
       setLoading(false);
       return;
     }
 
-    setSuccessEmail(trimmed);
+    setInviteToken(data.token);
     setEmail('');
     setLoading(false);
   }
@@ -67,7 +67,7 @@ export function InviteMemberScreen({ onBack }: Props) {
         placeholder="Email address"
         placeholderTextColor="#6B7280"
         value={email}
-        onChangeText={(v) => { setEmail(v); setSuccessEmail(null); setError(null); }}
+        onChangeText={(v) => { setEmail(v); setInviteToken(null); setError(null); }}
         keyboardType="email-address"
         autoCapitalize="none"
         editable={!loading}
@@ -89,8 +89,12 @@ export function InviteMemberScreen({ onBack }: Props) {
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
-      {successEmail && (
-        <Text style={styles.success}>Invite sent to {successEmail}</Text>
+      {inviteToken && (
+        <View style={styles.tokenBox}>
+          <Text style={styles.tokenLabel}>Share this code with your invitee:</Text>
+          <Text style={styles.tokenValue} selectable>{inviteToken}</Text>
+          <Text style={styles.tokenHint}>They enter this in "Have an invite code? Join instead"</Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -181,11 +185,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  success: {
-    color: '#10B981',
-    fontSize: 14,
-    marginBottom: 12,
-    fontWeight: '500',
+  tokenBox: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  tokenLabel: {
+    fontSize: 13,
+    color: '#4F6BED',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  tokenValue: {
+    fontSize: 13,
+    color: '#1A1A2E',
+    fontFamily: 'monospace' as const,
+    marginBottom: 8,
+  },
+  tokenHint: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   button: {
     backgroundColor: '#4F6BED',
