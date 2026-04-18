@@ -1,27 +1,16 @@
-# Current Issue: Supabase Schema + Sprint 1 Foundation
+# Sprint 1 — COMPLETE
 
-## Goal
-Create Supabase database schema for Sprint 1 (auth, family, members, tasks, invitations), then build auth screens, family creation, member invitations, and task board.
+## Shipped
+- Auth (sign up / sign in / sign out, SecureStore session persistence)
+- Family creation + Zustand store
+- Member invitations (token-based, manual share)
+- Task board (create, complete, uncomplete, done section)
 
-## Status: IN PROGRESS — writing SQL schema
+## Known Issues to Fix Before Launch
+- RLS disabled on all tables (Supabase JWKS issue on new projects — fix via Edge Functions before production)
+- Email delivery not wired (need Resend + Edge Function in Sprint 2)
 
-## Acceptance Criteria
-- [ ] Tables: profiles, families, family_members, tasks, invitations
-- [ ] Row-level security policies on all tables
-- [ ] Auth screens (sign up / sign in)
-- [ ] Family creation flow
-- [ ] Member invitation by email
-- [ ] Task board (create / assign / complete)
-
-## Touched Files
-- src/lib/supabase.ts
-- src/store/auth.ts
-- src/types/index.ts
-- App.tsx
-
-## Decisions
-- Supabase RLS: families scoped by family_members join, not owner field alone
-- Invitations use a random token (uuid); no magic-link dependency for v1
-
-## Next Step
-Run SQL schema in Supabase dashboard → then build auth screens
+## Sprint 2 — Next (Weeks 7–8)
+- Calendar
+- Medication manager
+- Basic health log
