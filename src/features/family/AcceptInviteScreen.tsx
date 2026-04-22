@@ -7,16 +7,25 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
+import { Icon } from '../../components/Icon';
+import { useTheme, spacing, radius, typography, type Theme } from '../../theme';
 import { Family, Invitation } from '../../types';
 
 interface Props {
-  onBack: () => void;
+  /** Shown as a top bar control when provided (e.g. secondary “join” path from create flow). */
+  onBack?: () => void;
+  /** Optional footer link (e.g. switch to create family). */
+  footerAction?: { label: string; onPress: () => void };
 }
 
-export function AcceptInviteScreen({ onBack }: Props) {
+export function AcceptInviteScreen({ onBack, footerAction }: Props) {
+  const t = useTheme();
+  const styles = makeStyles(t);
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
@@ -96,95 +105,119 @@ export function AcceptInviteScreen({ onBack }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={onBack} style={styles.back}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+    <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
+      {onBack ? (
+        <TouchableOpacity onPress={onBack} style={styles.back}>
+          <Icon name="back" size={18} color={t.accent} />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.backSpacer} />
+      )}
 
-      <Text style={styles.title}>Join a family</Text>
-      <Text style={styles.subtitle}>Paste the invite code from your email.</Text>
+      <View style={styles.main}>
+        <Text style={styles.title}>Join your family</Text>
+        <Text style={styles.subtitle}>Paste the invite code you received from your family (message, email, or notes).</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Invite code (UUID)"
-        placeholderTextColor="#6B7280"
-        value={token}
-        onChangeText={(v) => { setToken(v); setError(null); }}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!loading}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Invite code"
+          placeholderTextColor={t.textSecondary}
+          value={token}
+          onChangeText={(v) => { setToken(v); setError(null); }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!loading}
+        />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleJoin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>Join Family</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleJoin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={t.surface} />
+          ) : (
+            <Text style={styles.buttonText}>Join family</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {footerAction ? (
+        <TouchableOpacity style={[styles.footerLink, { paddingBottom: insets.bottom + spacing.lg }]} onPress={footerAction.onPress}>
+          <Text style={styles.footerLinkText}>{footerAction.label}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9F7F4',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-  },
-  back: {
-    marginBottom: 24,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#4F6BED',
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 32,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1A2E',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
-  },
-  error: {
-    color: '#EF4444',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: '#4F6BED',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+      paddingHorizontal: spacing.xxl,
+    },
+    main: { flex: 1, justifyContent: 'center', marginTop: -spacing.xxxl },
+    backSpacer: { height: spacing.md },
+    back: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: 4,
+      paddingHorizontal: spacing.xs,
+      marginBottom: spacing.lg,
+    },
+    backText: {
+      ...typography.callout,
+      fontWeight: '700',
+      color: t.accent,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: t.text,
+      marginBottom: spacing.sm,
+    },
+    subtitle: {
+      ...typography.subhead,
+      fontWeight: '400',
+      color: t.textSecondary,
+      marginBottom: spacing.xxxl,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: radius.lg,
+      padding: spacing.md + 2,
+      fontSize: 16,
+      color: t.text,
+      backgroundColor: t.surface,
+      marginBottom: spacing.xl,
+    },
+    error: {
+      color: t.error,
+      fontSize: 14,
+      marginBottom: spacing.md,
+    },
+    button: {
+      backgroundColor: t.accent,
+      borderRadius: radius.xxl - 4,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonText: {
+      color: t.surface,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    footerLink: { alignItems: 'center', paddingTop: spacing.md },
+    footerLinkText: { ...typography.callout, color: t.textTertiary, fontWeight: '600' },
+  });
+}

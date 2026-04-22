@@ -7,13 +7,22 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
+import { useTheme, spacing, radius, typography, type Theme } from '../../theme';
 import { Family } from '../../types';
 
-export function CreateFamilyScreen() {
-  const { user, session } = useAuthStore();
+interface Props {
+  footerAction?: { label: string; onPress: () => void };
+}
+
+export function CreateFamilyScreen({ footerAction }: Props) {
+  const t = useTheme();
+  const styles = makeStyles(t);
+  const insets = useSafeAreaInsets();
+  const { user } = useAuthStore();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
   const [familyName, setFamilyName] = useState('');
@@ -64,90 +73,103 @@ export function CreateFamilyScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create your family</Text>
-      <Text style={styles.subtitle}>Set up a shared space for your care team.</Text>
+    <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
+      <View style={styles.main}>
+        <Text style={styles.title}>Create new</Text>
+        <Text style={styles.subtitle}>Set up a shared space when you are the one starting the circle.</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Family name"
-        placeholderTextColor="#6B7280"
-        value={familyName}
-        onChangeText={setFamilyName}
-        editable={!loading}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Care recipient's name"
-        placeholderTextColor="#6B7280"
-        value={recipientName}
-        onChangeText={setRecipientName}
-        editable={!loading}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Family name"
+          placeholderTextColor={t.textSecondary}
+          value={familyName}
+          onChangeText={setFamilyName}
+          editable={!loading}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Care recipient's name"
+          placeholderTextColor={t.textSecondary}
+          value={recipientName}
+          onChangeText={setRecipientName}
+          editable={!loading}
+        />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>Create Family</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={t.surface} />
+          ) : (
+            <Text style={styles.buttonText}>Create family</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {footerAction ? (
+        <TouchableOpacity style={[styles.footerLink, { paddingBottom: insets.bottom + spacing.lg }]} onPress={footerAction.onPress}>
+          <Text style={styles.footerLinkText}>{footerAction.label}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9F7F4',
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 32,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1A2E',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
-  },
-  error: {
-    color: '#EF4444',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: '#4F6BED',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+      paddingHorizontal: spacing.xxl,
+    },
+    main: { flex: 1, justifyContent: 'center', marginTop: -spacing.xxxl },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: t.text,
+      marginBottom: spacing.sm,
+    },
+    subtitle: {
+      ...typography.subhead,
+      fontWeight: '400',
+      color: t.textSecondary,
+      marginBottom: spacing.xxxl,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: radius.lg,
+      padding: spacing.md + 2,
+      fontSize: 16,
+      color: t.text,
+      backgroundColor: t.surface,
+      marginBottom: spacing.lg,
+    },
+    error: {
+      color: t.error,
+      fontSize: 14,
+      marginBottom: spacing.md,
+    },
+    button: {
+      backgroundColor: t.accent,
+      borderRadius: radius.xxl - 4,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginTop: spacing.sm,
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonText: {
+      color: t.surface,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    footerLink: { alignItems: 'center', paddingTop: spacing.md },
+    footerLinkText: { ...typography.callout, color: t.accent, fontWeight: '600' },
+  });
+}

@@ -1,0 +1,168 @@
+{
+  "language": {
+    "screenTitle": "言語",
+    "rowLabel": "言語",
+    "rowSublabel": "アプリの表示言語、または端末に合わせる",
+    "hint": "Kin の表示言語を選びます。「システム」は対応している場合、起動のたびに端末の言語を使います。",
+    "optionSystem": "システム",
+    "optionMatchDevice": "端末に合わせる",
+    "optionEnglish": "英語",
+    "optionSpanish": "スペイン語",
+    "optionFrench": "フランス語",
+    "optionGerman": "ドイツ語",
+    "optionJapanese": "日本語",
+    "optionChineseSimplified": "中国語（簡体字）"
+  },
+  "common": { "cancel": "キャンセル", "save": "保存", "edit": "編集" },
+  "settings": {
+    "sections": {
+      "account": "アカウント",
+      "family": "家族",
+      "preferences": "設定",
+      "privacy": "プライバシーとデータ",
+      "about": "について"
+    },
+    "profile": { "displayNamePlaceholder": "表示名" },
+    "family": {
+      "nameLabel": "家族名",
+      "namePlaceholder": "家族名",
+      "caringForLabel": "介護対象",
+      "recipientPlaceholder": "介護対象の氏名"
+    },
+    "preferences": {
+      "appearance": "外観",
+      "appearanceSub": "ライト、ダーク、または端末に合わせる",
+      "language": "言語",
+      "languageSub": "アプリの表示言語、または端末に合わせる",
+      "notifications": "通知",
+      "notificationsSub": "プッシュ通知とリマインダー",
+      "accessibility": "アクセシビリティ",
+      "accessibilitySub": "触覚フィードバック。利用可能なら「動きを減らす」に従います"
+    },
+    "privacy": {
+      "dataPrivacy": "データとプライバシー",
+      "dataPrivacySub": "Visit Prep の履歴や健康ログを消去（管理者のみ）",
+      "export": "家族データを書き出す",
+      "exportSub": "タスク、服薬、ログなどのテキスト書き出しを共有",
+      "exporting": "書き出しを準備中…",
+      "deleteAccount": "アカウントを削除",
+      "deleteAccountSub": "アクセスを削除し、データ削除を予約します"
+    },
+    "about": {
+      "version": "バージョン",
+      "sendFeedback": "フィードバックを送る",
+      "privacyPolicy": "プライバシーポリシー",
+      "terms": "利用規約"
+    },
+    "signOut": "サインアウト",
+    "footerTagline": "Kin · 家族のケアをひとつに",
+    "alerts": {
+      "saveFailedTitle": "保存できませんでした",
+      "saveFailedMessage": "もう一度お試しください。",
+      "exportFailedTitle": "書き出しに失敗しました",
+      "exportFailedMessage": "データを書き出せませんでした。もう一度お試しください。",
+      "deleteTitle": "アカウントを削除",
+      "deleteMessage": "この家族へのアクセスがなくなり、サインアウトします。データは30日以内に完全に削除されます。\n\n取り消せません。",
+      "deleteConfirm": "アカウントを削除する",
+      "signOutTitle": "サインアウト",
+      "signOutMessage": "サインアウトしますか？",
+      "signOutConfirm": "サインアウト"
+    },
+    "export": {
+      "shareTitle": "Kin 書き出し — {{name}}",
+      "title": "KIN — 家族データの書き出し",
+      "familyLine": "家族: {{name}}",
+      "caringLine": "介護対象: {{name}}",
+      "sectionTasks": "タスク ({{count}})",
+      "sectionMedications": "服薬 ({{count}})",
+      "sectionHealth": "健康ログ ({{count}} 件)",
+      "sectionCalendar": "カレンダー予定 ({{count}})",
+      "sectionCheckins": "チェックイン ({{count}})",
+      "taskDue": "  [期限 {{date}}]",
+      "healthPhoto": "  [写真あり]",
+      "calendarAt": "  @ {{location}}"
+    }
+  },
+  "auth": {
+    "brand": { "name": "Kin", "tagline": "ケアを、ひとつに。" },
+    "signIn": {
+      "title": "おかえりなさい",
+      "email": "メール",
+      "password": "パスワード",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "••••••••",
+      "submit": "サインイン",
+      "noAccount": "アカウントをお持ちでないですか？ ",
+      "create": "作成する"
+    },
+    "signUp": {
+      "createTitle": "アカウントを作成",
+      "step1of2": "ステップ 1 / 2",
+      "fullName": "氏名",
+      "namePlaceholder": "山田 太郎",
+      "email": "メール",
+      "password": "パスワード",
+      "passwordHint": "8文字以上",
+      "continue": "続ける",
+      "inviteTitle": "家族を招待",
+      "step2of2": "ステップ 2 / 2",
+      "inviteBody": "日々支える人たちが同じ場所にいるほど Kin は活きます。登録後、「メンバー」から安全な招待を送れます。各自が自分のアカウントで参加します。",
+      "createAccount": "アカウントを作成",
+      "editDetails": "内容を編集",
+      "hasAccount": "すでにアカウントをお持ちですか？ ",
+      "signInLink": "サインイン",
+      "successTitle": "メールを確認してください",
+      "successDesc": "{{email}} に確認リンクを送りました。開いてアカウントを有効化してください。数分経っても届かない場合は迷惑メールやプロモーションをご確認ください。",
+      "goSignIn": "サインインへ",
+      "errors": {
+        "allFields": "すべての項目を入力してください。",
+        "passwordLength": "パスワードは8文字以上にしてください。",
+        "duplicateEmail": "このメールは既に登録されています。サインインするか、Supabase の Authentication → Users からユーザーを削除してください。"
+      }
+    },
+    "welcome": {
+      "skip": "スキップ",
+      "next": "次へ",
+      "getStarted": "はじめる",
+      "slide1Headline": "ケアをひとまとめに。",
+      "slide1Body": "服薬、タスク、予定を落ち着いた一か所で。",
+      "slide2Headline": "状況を共有。",
+      "slide2Body": "チェックインとメモで、今日の様子をみんなが把握。",
+      "slide3Headline": "認識をそろえる。",
+      "slide3Body": "家族と介護者のための共有スペース。グループチャットの混乱なし。"
+    }
+  },
+  "home": {
+    "caringFor": "{{name}} の介護",
+    "a11ySettings": "設定",
+    "a11yMembers": "メンバー",
+    "a11yDocuments": "書類",
+    "needsAttention": "要対応",
+    "browseHide": "セクションを隠す",
+    "browseShow": "すべてのセクションを表示",
+    "allClearTitle": "問題なし",
+    "allClearSub": "今日はすべて最新です",
+    "attention": {
+      "overdueTasks_one": "期限切れのタスクが{{count}}件あります",
+      "overdueTasks_other": "期限切れのタスクが{{count}}件あります",
+      "medDoses_one": "未記録の服用が{{count}}回",
+      "medDoses_other": "未記録の服用が{{count}}回",
+      "eventsSingle": "今日は {{title}}",
+      "eventsMulti": "{{title}} ほか{{extra}}件が今日",
+      "checkIn": "今日のチェックインを記録",
+      "healthLog": "健康ログを追加"
+    },
+    "nav": {
+      "tasks": { "label": "タスク", "desc": "ToDo と割り当て" },
+      "calendar": { "label": "カレンダー", "desc": "予約と予定" },
+      "visitprep": { "label": "受診準備", "desc": "AIによる診察サマリー" },
+      "doctors": { "label": "かかりつけ医", "desc": "ケアチームと連絡先" },
+      "medications": { "label": "服薬", "desc": "スケジュールと服用" },
+      "health": { "label": "健康ログ", "desc": "症状とバイタル" },
+      "checkins": { "label": "チェックイン", "desc": "日々の状態" },
+      "documents": { "label": "書類", "desc": "医療・法的ファイル" },
+      "notes": { "label": "メモ", "desc": "家族みんなの更新" },
+      "members": { "label": "メンバー", "desc": "家族と介護者" }
+    }
+  }
+}

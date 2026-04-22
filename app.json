@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "kin.care",
-    "slug": "kin.care",
+    "slug": "kin-care",
+    "scheme": "kincare",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.dchousal.kincare",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +33,15 @@
     },
     "extra": {
       "supabaseUrl": "https://toowcdabumseydziiodz.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb3djZGFidW1zZXlkemlpb2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTQyNzUsImV4cCI6MjA5MjAzMDI3NX0.d962DRPOY-uYNwwXDC1K8RRBNntA0XS6xLe7MQWNz54"
-    }
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb3djZGFidW1zZXlkemlpb2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTQyNzUsImV4cCI6MjA5MjAzMDI3NX0.d962DRPOY-uYNwwXDC1K8RRBNntA0XS6xLe7MQWNz54",
+      "eas": {
+        "projectId": "f94b78ad-c790-43d7-a030-94eb40f47bfa"
+      }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "@sentry/react-native"
+    ],
+    "owner": "dchousal"
   }
 }

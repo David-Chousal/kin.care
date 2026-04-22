@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
+import { useTheme, elevation, spacing, space, radius, typography, type Theme } from '../../theme';
+import type { AuthStackParamList } from '../../navigation/types';
 
-interface Props {
-  onToggle: () => void;
-}
-
-export function SignInScreen({ onToggle }: Props) {
+export function SignInScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const t = useTheme();
+  const { t: tx } = useTranslation();
+  const styles = makeStyles(t);
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,100 +27,107 @@ export function SignInScreen({ onToggle }: Props) {
     setLoading(true);
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (authError) {
-      setError(authError.message);
-    }
+    if (authError) setError(authError.message);
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Sign in to your Kin account</Text>
+    <KeyboardAvoidingView
+      style={styles.outer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + space[6] + space[2], paddingBottom: insets.bottom + space[5] }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.brand}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoText}>K</Text>
+          </View>
+          <Text style={styles.appName}>{tx('auth.brand.name')}</Text>
+          <Text style={styles.tagline}>{tx('auth.brand.tagline')}</Text>
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#6B7280"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#6B7280"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <View style={styles.form}>
+          <Text style={styles.formTitle}>{tx('auth.signIn.title')}</Text>
 
-      {error !== '' && <Text style={styles.error}>{error}</Text>}
+          <Text style={styles.label}>{tx('auth.signIn.email')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={tx('auth.signIn.emailPlaceholder')}
+            placeholderTextColor={t.textTertiary}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            returnKeyType="next"
+            value={email}
+            onChangeText={setEmail}
+          />
 
-      <TouchableOpacity style={styles.button} onPress={handleSignIn} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
-        )}
-      </TouchableOpacity>
+          <Text style={styles.label}>{tx('auth.signIn.password')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={tx('auth.signIn.passwordPlaceholder')}
+            placeholderTextColor={t.textTertiary}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleSignIn}
+            value={password}
+            onChangeText={setPassword}
+          />
 
-      <TouchableOpacity onPress={onToggle}>
-        <Text style={styles.link}>Create account</Text>
-      </TouchableOpacity>
-    </View>
+          {error !== '' && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.button} onPress={handleSignIn} disabled={loading}>
+            {loading ? <ActivityIndicator color={t.surface} /> : <Text style={styles.buttonText}>{tx('auth.signIn.submit')}</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.toggleBtn} onPress={() => navigation.navigate('SignUp')}>
+            <Text style={styles.toggleText}>{tx('auth.signIn.noAccount')}</Text>
+            <Text style={styles.toggleLink}>{tx('auth.signIn.create')}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9F7F4',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 32,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1A2E',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 12,
-  },
-  error: {
-    color: '#DC2626',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: '#4F6BED',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  link: {
-    color: '#4F6BED',
-    fontSize: 15,
-    textAlign: 'center',
-  },
-});
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    outer: { flex: 1, backgroundColor: t.bg },
+    container: { flexGrow: 1, paddingHorizontal: space[5] },
+    brand: { alignItems: 'center', marginBottom: space[6] + space[2], gap: space[2] },
+    logoCircle: {
+      width: 72, height: 72, borderRadius: 22,
+      backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center',
+      ...elevation(3, t.accent),
+    },
+    logoText: { fontSize: 36, fontWeight: '800', color: t.surface },
+    appName: { ...typography.display, color: t.text },
+    tagline: { ...typography.body, color: t.textSecondary },
+    form: {
+      backgroundColor: t.surface, borderRadius: radius.xxl, padding: space[5],
+      ...elevation(2, t.shadow),
+    },
+    formTitle: { ...typography.heading, fontSize: 20, lineHeight: 24, letterSpacing: -0.2, color: t.text, marginBottom: spacing.xl },
+    label: { ...typography.caption, fontWeight: '600', color: t.textSecondary, marginBottom: space[2] },
+    input: {
+      borderWidth: 1, borderColor: t.border, borderRadius: radius.lg,
+      paddingHorizontal: space[4], paddingVertical: space[3], ...typography.body,
+      color: t.text, backgroundColor: t.bg, marginBottom: space[3] + space[1],
+    },
+    errorBox: { backgroundColor: t.errorSurface, borderRadius: radius.md, padding: space[3], marginBottom: space[3] + space[1] },
+    errorText: { ...typography.caption, color: t.error },
+    button: {
+      backgroundColor: t.accent, borderRadius: radius.xl, paddingVertical: space[4],
+      alignItems: 'center', marginTop: space[1], marginBottom: space[4],
+      ...elevation(4, t.accent),
+    },
+    buttonText: { ...typography.subhead, color: t.surface, fontWeight: '700' },
+    toggleBtn: { flexDirection: 'row', justifyContent: 'center' },
+    toggleText: { ...typography.callout, color: t.textSecondary },
+    toggleLink: { ...typography.callout, color: t.accent, fontWeight: '600' },
+  });
+}

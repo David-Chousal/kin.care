@@ -1,0 +1,168 @@
+{
+  "language": {
+    "screenTitle": "Sprache",
+    "rowLabel": "Sprache",
+    "rowSublabel": "App-Sprache oder Gerät übernehmen",
+    "hint": "Legen Sie fest, wie Kin Texte anzeigt. „System“ nutzt bei jedem frischen Start die Gerätesprache, sofern wir sie unterstützen.",
+    "optionSystem": "System",
+    "optionMatchDevice": "Wie Gerät",
+    "optionEnglish": "Englisch",
+    "optionSpanish": "Spanisch",
+    "optionFrench": "Französisch",
+    "optionGerman": "Deutsch",
+    "optionJapanese": "Japanisch",
+    "optionChineseSimplified": "Chinesisch (vereinfacht)"
+  },
+  "common": { "cancel": "Abbrechen", "save": "Speichern", "edit": "Bearbeiten" },
+  "settings": {
+    "sections": {
+      "account": "Konto",
+      "family": "Familie",
+      "preferences": "Einstellungen",
+      "privacy": "Datenschutz & Daten",
+      "about": "Info"
+    },
+    "profile": { "displayNamePlaceholder": "Anzeigename" },
+    "family": {
+      "nameLabel": "Familienname",
+      "namePlaceholder": "Familienname",
+      "caringForLabel": "Pflege für",
+      "recipientPlaceholder": "Name der pflegebedürftigen Person"
+    },
+    "preferences": {
+      "appearance": "Erscheinungsbild",
+      "appearanceSub": "Hell, dunkel oder wie das Gerät",
+      "language": "Sprache",
+      "languageSub": "App-Sprache oder Gerät übernehmen",
+      "notifications": "Mitteilungen",
+      "notificationsSub": "Push-Mitteilungen und Erinnerungen",
+      "accessibility": "Bedienungshilfen",
+      "accessibilitySub": "Haptik; Übergänge folgen „Bewegung reduzieren“, falls verfügbar"
+    },
+    "privacy": {
+      "dataPrivacy": "Daten & Datenschutz",
+      "dataPrivacySub": "Visit-Prep-Verlauf oder Gesundheitsprotokolle löschen (nur Admins)",
+      "export": "Familiendaten exportieren",
+      "exportSub": "Vollständigen Textexport mit Aufgaben, Medikamenten, Protokollen u. a. teilen",
+      "exporting": "Export wird vorbereitet…",
+      "deleteAccount": "Konto löschen",
+      "deleteAccountSub": "Entfernt Ihren Zugang und plant Datenlöschung"
+    },
+    "about": {
+      "version": "Version",
+      "sendFeedback": "Feedback senden",
+      "privacyPolicy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
+    },
+    "signOut": "Abmelden",
+    "footerTagline": "Kin · Familienpflege koordinieren",
+    "alerts": {
+      "saveFailedTitle": "Speichern fehlgeschlagen",
+      "saveFailedMessage": "Bitte erneut versuchen.",
+      "exportFailedTitle": "Export fehlgeschlagen",
+      "exportFailedMessage": "Daten konnten nicht exportiert werden. Bitte erneut versuchen.",
+      "deleteTitle": "Konto löschen",
+      "deleteMessage": "Dadurch verlieren Sie den Zugang zu dieser Familie und werden abgemeldet. Ihre Daten werden innerhalb von 30 Tagen dauerhaft gelöscht.\n\nDas kann nicht rückgängig gemacht werden.",
+      "deleteConfirm": "Mein Konto löschen",
+      "signOutTitle": "Abmelden",
+      "signOutMessage": "Wirklich abmelden?",
+      "signOutConfirm": "Abmelden"
+    },
+    "export": {
+      "shareTitle": "Kin-Export — {{name}}",
+      "title": "KIN — FAMILIENDATEN-EXPORT",
+      "familyLine": "Familie: {{name}}",
+      "caringLine": "Pflege für: {{name}}",
+      "sectionTasks": "AUFGABEN ({{count}})",
+      "sectionMedications": "MEDIKAMENTE ({{count}})",
+      "sectionHealth": "GESUNDHEITSPROTOKOLL ({{count}} Einträge)",
+      "sectionCalendar": "KALENDEREREIGNISSE ({{count}})",
+      "sectionCheckins": "CHECK-INS ({{count}})",
+      "taskDue": "  [fällig {{date}}]",
+      "healthPhoto": "  [Foto archiviert]",
+      "calendarAt": "  @ {{location}}"
+    }
+  },
+  "auth": {
+    "brand": { "name": "Kin", "tagline": "Fürsorge, koordiniert." },
+    "signIn": {
+      "title": "Willkommen zurück",
+      "email": "E-Mail",
+      "password": "Passwort",
+      "emailPlaceholder": "sie@beispiel.de",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Anmelden",
+      "noAccount": "Noch kein Konto? ",
+      "create": "Konto erstellen"
+    },
+    "signUp": {
+      "createTitle": "Konto erstellen",
+      "step1of2": "Schritt 1 von 2",
+      "fullName": "Vollständiger Name",
+      "namePlaceholder": "Maria Muster",
+      "email": "E-Mail",
+      "password": "Passwort",
+      "passwordHint": "Mindestens 8 Zeichen",
+      "continue": "Weiter",
+      "inviteTitle": "Familie einladen",
+      "step2of2": "Schritt 2 von 2",
+      "inviteBody": "Kin funktioniert am besten, wenn alle, die täglich helfen, am selben Ort sind. Nach der Registrierung können Sie sichere Einladungen unter „Mitglieder“ senden – jede Person nutzt ihr eigenes Konto.",
+      "createAccount": "Konto anlegen",
+      "editDetails": "Angaben bearbeiten",
+      "hasAccount": "Schon ein Konto? ",
+      "signInLink": "Anmelden",
+      "successTitle": "E-Mail prüfen",
+      "successDesc": "Wir haben einen Bestätigungslink an {{email}} gesendet. Öffnen Sie ihn, um das Konto zu aktivieren. Wenn innerhalb weniger Minuten nichts ankommt, prüfen Sie Spam oder „Werbung“.",
+      "goSignIn": "Zur Anmeldung",
+      "errors": {
+        "allFields": "Bitte alle Felder ausfüllen.",
+        "passwordLength": "Das Passwort muss mindestens 8 Zeichen haben.",
+        "duplicateEmail": "Diese E-Mail hat bereits ein Konto. Versuchen Sie die Anmeldung oder löschen Sie den Benutzer in Supabase → Authentication → Users."
+      }
+    },
+    "welcome": {
+      "skip": "Überspringen",
+      "next": "Weiter",
+      "getStarted": "Loslegen",
+      "slide1Headline": "Pflege im Blick.",
+      "slide1Body": "Medikamente, Aufgaben und Termine an einem ruhigen Ort.",
+      "slide2Headline": "Updates teilen.",
+      "slide2Body": "Check-ins und Notizen, damit alle wissen, wie der Tag lief.",
+      "slide3Headline": "Im Gleichschritt bleiben.",
+      "slide3Body": "Ein gemeinsamer Raum für Familie und Pflegende – ohne Gruppenchat-Chaos."
+    }
+  },
+  "home": {
+    "caringFor": "Pflege für {{name}}",
+    "a11ySettings": "Einstellungen",
+    "a11yMembers": "Mitglieder",
+    "a11yDocuments": "Dokumente",
+    "needsAttention": "Achtung nötig",
+    "browseHide": "Bereiche ausblenden",
+    "browseShow": "Alle Bereiche anzeigen",
+    "allClearTitle": "Alles erledigt",
+    "allClearSub": "Heute ist alles auf dem neuesten Stand",
+    "attention": {
+      "overdueTasks_one": "{{count}} Aufgabe braucht Aufmerksamkeit",
+      "overdueTasks_other": "{{count}} Aufgaben brauchen Aufmerksamkeit",
+      "medDoses_one": "{{count}} Dosis noch nicht protokolliert",
+      "medDoses_other": "{{count}} Dosen noch nicht protokolliert",
+      "eventsSingle": "{{title}} heute",
+      "eventsMulti": "{{title}} +{{extra}} weitere heute",
+      "checkIn": "Heutigen Check-in eintragen",
+      "healthLog": "Gesundheitseintrag hinzufügen"
+    },
+    "nav": {
+      "tasks": { "label": "Aufgaben", "desc": "To-dos & Zuweisungen" },
+      "calendar": { "label": "Kalender", "desc": "Termine & Ereignisse" },
+      "visitprep": { "label": "Besuchsvorb.", "desc": "KI-Zusammenfassung Arztbesuch" },
+      "doctors": { "label": "Ärzt:innen", "desc": "Team & Kontakte" },
+      "medications": { "label": "Medikamente", "desc": "Pläne & Einnahmen" },
+      "health": { "label": "Gesundheit", "desc": "Symptome & Vitalwerte" },
+      "checkins": { "label": "Check-ins", "desc": "Tagesstatus" },
+      "documents": { "label": "Dokumente", "desc": "Medizinische & rechtliche Dateien" },
+      "notes": { "label": "Notizen", "desc": "Familien-Updates" },
+      "members": { "label": "Mitglieder", "desc": "Familie & Pflegende" }
+    }
+  }
+}

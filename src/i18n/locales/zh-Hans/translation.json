@@ -1,0 +1,168 @@
+{
+  "language": {
+    "screenTitle": "语言",
+    "rowLabel": "语言",
+    "rowSublabel": "应用语言或跟随系统",
+    "hint": "选择 Kin 的显示文字。「系统」在每次冷启动时使用设备语言（若我们支持）。",
+    "optionSystem": "系统",
+    "optionMatchDevice": "跟随设备",
+    "optionEnglish": "英语",
+    "optionSpanish": "西班牙语",
+    "optionFrench": "法语",
+    "optionGerman": "德语",
+    "optionJapanese": "日语",
+    "optionChineseSimplified": "中文（简体）"
+  },
+  "common": { "cancel": "取消", "save": "保存", "edit": "编辑" },
+  "settings": {
+    "sections": {
+      "account": "账户",
+      "family": "家庭",
+      "preferences": "偏好设置",
+      "privacy": "隐私与数据",
+      "about": "关于"
+    },
+    "profile": { "displayNamePlaceholder": "显示名称" },
+    "family": {
+      "nameLabel": "家庭名称",
+      "namePlaceholder": "家庭名称",
+      "caringForLabel": "照护对象",
+      "recipientPlaceholder": "照护对象姓名"
+    },
+    "preferences": {
+      "appearance": "外观",
+      "appearanceSub": "浅色、深色或跟随设备",
+      "language": "语言",
+      "languageSub": "应用语言或跟随系统",
+      "notifications": "通知",
+      "notificationsSub": "推送通知与提醒偏好",
+      "accessibility": "辅助功能",
+      "accessibilitySub": "触感反馈；在可用时遵循系统“减弱动态效果”"
+    },
+    "privacy": {
+      "dataPrivacy": "数据与隐私",
+      "dataPrivacySub": "清除就诊准备历史或健康记录（仅管理员）",
+      "export": "导出家庭数据",
+      "exportSub": "分享包含任务、用药、记录等的完整文本导出",
+      "exporting": "正在准备导出…",
+      "deleteAccount": "删除账户",
+      "deleteAccountSub": "移除您的访问权限并安排删除数据"
+    },
+    "about": {
+      "version": "版本",
+      "sendFeedback": "发送反馈",
+      "privacyPolicy": "隐私政策",
+      "terms": "服务条款"
+    },
+    "signOut": "退出登录",
+    "footerTagline": "Kin · 家庭照护协同",
+    "alerts": {
+      "saveFailedTitle": "无法保存",
+      "saveFailedMessage": "请重试。",
+      "exportFailedTitle": "导出失败",
+      "exportFailedMessage": "无法导出数据，请重试。",
+      "deleteTitle": "删除账户",
+      "deleteMessage": "这将移除您对该家庭的访问并退出登录。您的数据将在 30 天内永久删除。\n\n此操作无法撤销。",
+      "deleteConfirm": "删除我的账户",
+      "signOutTitle": "退出登录",
+      "signOutMessage": "确定要退出登录吗？",
+      "signOutConfirm": "退出登录"
+    },
+    "export": {
+      "shareTitle": "Kin 导出 — {{name}}",
+      "title": "KIN — 家庭数据导出",
+      "familyLine": "家庭：{{name}}",
+      "caringLine": "照护对象：{{name}}",
+      "sectionTasks": "任务 ({{count}})",
+      "sectionMedications": "用药 ({{count}})",
+      "sectionHealth": "健康记录 ({{count}} 条)",
+      "sectionCalendar": "日历事件 ({{count}})",
+      "sectionCheckins": "签到 ({{count}})",
+      "taskDue": "  [截止 {{date}}]",
+      "healthPhoto": "  [有照片存档]",
+      "calendarAt": "  @ {{location}}"
+    }
+  },
+  "auth": {
+    "brand": { "name": "Kin", "tagline": "照护，彼此同步。" },
+    "signIn": {
+      "title": "欢迎回来",
+      "email": "电子邮箱",
+      "password": "密码",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "••••••••",
+      "submit": "登录",
+      "noAccount": "还没有账户？",
+      "create": "创建一个"
+    },
+    "signUp": {
+      "createTitle": "创建账户",
+      "step1of2": "第 1 步，共 2 步",
+      "fullName": "姓名",
+      "namePlaceholder": "张三",
+      "email": "电子邮箱",
+      "password": "密码",
+      "passwordHint": "至少 8 个字符",
+      "continue": "继续",
+      "inviteTitle": "邀请家人",
+      "step2of2": "第 2 步，共 2 步",
+      "inviteBody": "当日常照护的亲友都在同一空间时，Kin 最有用。注册后，您可以在「成员」中发送安全邀请——每人使用自己的账户加入。",
+      "createAccount": "创建账户",
+      "editDetails": "编辑信息",
+      "hasAccount": "已有账户？",
+      "signInLink": "登录",
+      "successTitle": "请查收邮件",
+      "successDesc": "我们已向 {{email}} 发送确认链接。打开链接以激活账户。若几分钟内未收到，请检查垃圾邮件或「推广」分类。",
+      "goSignIn": "前往登录",
+      "errors": {
+        "allFields": "请填写所有字段。",
+        "passwordLength": "密码至少需要 8 个字符。",
+        "duplicateEmail": "该邮箱已有账户。请尝试登录，或在 Supabase 的 Authentication → Users 中删除用户。"
+      }
+    },
+    "welcome": {
+      "skip": "跳过",
+      "next": "下一步",
+      "getStarted": "开始使用",
+      "slide1Headline": "跟踪照护。",
+      "slide1Body": "用药、任务与预约，集中在一处安心管理。",
+      "slide2Headline": "分享动态。",
+      "slide2Body": "签到与笔记，让每个人了解今天的情况。",
+      "slide3Headline": "保持一致。",
+      "slide3Body": "家人与照护者的共享空间——告别群聊混乱。"
+    }
+  },
+  "home": {
+    "caringFor": "照护 {{name}}",
+    "a11ySettings": "设置",
+    "a11yMembers": "成员",
+    "a11yDocuments": "文件",
+    "needsAttention": "需要关注",
+    "browseHide": "隐藏分区",
+    "browseShow": "浏览所有分区",
+    "allClearTitle": "一切正常",
+    "allClearSub": "今天都已更新",
+    "attention": {
+      "overdueTasks_one": "{{count}} 个任务需要处理",
+      "overdueTasks_other": "{{count}} 个任务需要处理",
+      "medDoses_one": "{{count}} 剂尚未记录",
+      "medDoses_other": "{{count}} 剂尚未记录",
+      "eventsSingle": "今日：{{title}}",
+      "eventsMulti": "{{title}} 等共 {{extra}} 项今日",
+      "checkIn": "记录今日签到",
+      "healthLog": "添加健康记录"
+    },
+    "nav": {
+      "tasks": { "label": "任务", "desc": "待办与分工" },
+      "calendar": { "label": "日历", "desc": "预约与活动" },
+      "visitprep": { "label": "就诊准备", "desc": "AI 就诊摘要" },
+      "doctors": { "label": "医生", "desc": "照护团队与联系人" },
+      "medications": { "label": "用药", "desc": "计划与剂量" },
+      "health": { "label": "健康记录", "desc": "症状与体征" },
+      "checkins": { "label": "签到", "desc": "每日状态" },
+      "documents": { "label": "文件", "desc": "医疗与法律文件" },
+      "notes": { "label": "笔记", "desc": "家庭动态" },
+      "members": { "label": "成员", "desc": "家人与照护者" }
+    }
+  }
+}

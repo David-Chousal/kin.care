@@ -2,6 +2,178 @@
 -- Kin — Sprint 1 Schema
 -- Run in: Supabase Dashboard > SQL Editor > New query
 -- ============================================================
+-- ============================================================
+-- Kin — Sprint 2 Schema (run AFTER Sprint 1)
+-- ============================================================
+
+-- 6. Calendar Events
+create table public.calendar_events (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families(id) on delete cascade,
+  title       text not null,
+  description text,
+  starts_at   timestamptz not null,
+  ends_at     timestamptz,
+  location    text,
+  created_by  uuid not null references public.profiles(id),
+  created_at  timestamptz default now()
+);
+
+-- 7. Medications
+create table public.medications (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families(id) on delete cascade,
+  name        text not null,
+  dosage      text not null,
+  frequency   text not null,
+  times       text[],
+  notes       text,
+  active      boolean not null default true,
+  created_by  uuid not null references public.profiles(id),
+  created_at  timestamptz default now()
+);
+
+-- 8. Medication Logs
+create table public.medication_logs (
+  id            uuid primary key default gen_random_uuid(),
+  medication_id uuid not null references public.medications(id) on delete cascade,
+  family_id     uuid not null references public.families(id) on delete cascade,
+  scheduled_at  timestamptz not null,
+  taken_at      timestamptz,
+  status        text not null default 'pending' check (status in ('taken', 'missed', 'pending')),
+  logged_by     uuid references public.profiles(id),
+  notes         text,
+  created_at    timestamptz default now()
+);
+
+-- 9. Health Logs
+create table public.health_logs (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references public.families(id) on delete cascade,
+  category    text not null check (category in ('symptom', 'vital', 'mood', 'note')),
+  title       text not null,
+  value       text,
+  unit        text,
+  notes       text,
+  logged_by   uuid not null references public.profiles(id),
+  logged_at   timestamptz not null default now(),
+  created_at  timestamptz default now()
+);
+
+-- RLS: disable for development (same as Sprint 1)
+alter table public.calendar_events  disable row level security;
+alter table public.medications       disable row level security;
+alter table public.medication_logs   disable row level security;
+alter table public.health_logs       disable row level security;
+
+-- ============================================================
+-- Kin — Sprint 3 Schema (run AFTER Sprint 2)
+-- ============================================================
+
+-- 10. Documents
+create table public.documents (
+  id           uuid primary key default gen_random_uuid(),
+  family_id    uuid not null references public.families(id) on delete cascade,
+  name         text not null,
+  file_path    text not null,
+  file_type    text,
+  file_size    int,
+  category     text not null default 'general'
+                 check (category in ('medical', 'legal', 'insurance', 'general')),
+  uploaded_by  uuid not null references public.profiles(id),
+  created_at   timestamptz default now()
+);
+
+-- 11. Check-ins
+create table public.checkins (
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references public.families(id) on delete cascade,
+  mood          text not null check (mood in ('great', 'good', 'okay', 'concerning', 'emergency')),
+  summary       text not null,
+  notes         text,
+  submitted_by  uuid not null references public.profiles(id),
+  created_at    timestamptz default now()
+);
+
+-- 12. Push tokens
+create table public.push_tokens (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  token       text not null,
+  created_at  timestamptz default now(),
+  unique(user_id, token)
+);
+
+alter table public.documents    disable row level security;
+alter table public.checkins     disable row level security;
+alter table public.push_tokens  disable row level security;
+
+-- 13. Visit Prep AI summaries (persisted for history / sharing)
+-- Prefer applying supabase/migrations/20260421140000_visit_prep_summaries.sql via CLI or Dashboard (avoids PGRST205).
+create table if not exists public.visit_prep_summaries (
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references public.families(id) on delete cascade,
+  content       text not null,
+  generated_at  timestamptz not null default now(),
+  created_by    uuid not null references public.profiles(id),
+  created_at    timestamptz default now(),
+  display_name  text
+);
+
+create index if not exists visit_prep_summaries_family_generated_idx
+  on public.visit_prep_summaries (family_id, generated_at desc);
+
+alter table public.visit_prep_summaries enable row level security;
+
+drop policy if exists "family members can view visit prep summaries" on public.visit_prep_summaries;
+drop policy if exists "family members can insert visit prep summaries" on public.visit_prep_summaries;
+drop policy if exists "visit prep creator can delete visit prep summaries" on public.visit_prep_summaries;
+
+create policy "family members can view visit prep summaries"
+  on public.visit_prep_summaries for select
+  using (public.is_family_member(family_id));
+
+create policy "family members can insert visit prep summaries"
+  on public.visit_prep_summaries for insert
+  with check (public.is_family_member(family_id) and auth.uid() = created_by);
+
+create policy "visit prep creator can delete visit prep summaries"
+  on public.visit_prep_summaries for delete
+  using (created_by = auth.uid());
+
+create policy "family admins can delete visit prep summaries"
+  on public.visit_prep_summaries for delete
+  using (
+    exists (
+      select 1 from public.family_members fm
+      where fm.family_id = visit_prep_summaries.family_id
+        and fm.user_id = auth.uid()
+        and fm.role = 'admin'
+    )
+  );
+
+drop policy if exists "visit prep creator can update visit prep summaries" on public.visit_prep_summaries;
+create policy "visit prep creator can update visit prep summaries"
+  on public.visit_prep_summaries for update
+  using (created_by = auth.uid());
+
+drop policy if exists "family admins can update visit prep summaries" on public.visit_prep_summaries;
+create policy "family admins can update visit prep summaries"
+  on public.visit_prep_summaries for update
+  using (
+    exists (
+      select 1 from public.family_members fm
+      where fm.family_id = visit_prep_summaries.family_id
+        and fm.user_id = auth.uid()
+        and fm.role = 'admin'
+    )
+  );
+
+-- health_logs admin bulk delete: same migration file applies
+-- "family admins can delete health logs" when RLS is enabled on health_logs.
+
+notify pgrst, 'reload schema';
+
 
 -- 1. Profiles (mirrors auth.users, populated via trigger)
 create table public.profiles (

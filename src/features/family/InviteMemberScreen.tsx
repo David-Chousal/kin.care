@@ -6,24 +6,32 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Share,
+  Linking,
+  Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../lib/supabase';
 import { useFamilyStore } from '../../store/family';
+import { useTheme, spacing, radius, typography, type Theme } from '../../theme';
 import { UserRole } from '../../types';
-
-interface Props {
-  onBack: () => void;
-}
+import type { MainStackParamList } from '../../navigation/types';
 
 const ROLES: UserRole[] = ['member', 'viewer'];
 
-export function InviteMemberScreen({ onBack }: Props) {
+export function InviteMemberScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const t = useTheme();
+  const styles = makeStyles(t);
   const family = useFamilyStore((s) => s.family);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  /** After a successful invite, we keep email + token so the inviter can share (Kin does not send email on its own). */
+  const [pendingInvite, setPendingInvite] = useState<{ token: string; email: string } | null>(null);
 
   async function handleSend() {
     if (!family) return;
@@ -48,26 +56,61 @@ export function InviteMemberScreen({ onBack }: Props) {
       return;
     }
 
-    setInviteToken(data.token);
+    setPendingInvite({ token: data.token, email: trimmed });
     setEmail('');
     setLoading(false);
   }
 
+  async function shareInvite() {
+    if (!pendingInvite) return;
+    const { token, email: invitee } = pendingInvite;
+    try {
+      await Share.share({
+        message:
+          `You're invited to Kin (family care app).\n\n` +
+          `Use this invite code in the app under "Have an invite code? Join your family":\n${token}\n\n` +
+          `Sign up or sign in with this same email address: ${invitee}`,
+      });
+    } catch {
+      Alert.alert('Could not share', 'Copy the code or use Email invite instead.');
+    }
+  }
+
+  function emailInvite() {
+    if (!pendingInvite) return;
+    const { token, email: invitee } = pendingInvite;
+    const subject = encodeURIComponent('Invitation to join Kin');
+    const body = encodeURIComponent(
+      "You've been invited to coordinate care on Kin.\n\n" +
+        `1) Install Kin and create an account with this email: ${invitee}\n` +
+        `2) In the app, choose "Have an invite code? Join your family"\n` +
+        `3) Paste this invite code:\n\n${token}\n`,
+    );
+    const url = `mailto:${invitee}?subject=${subject}&body=${body}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Could not open Mail', 'Copy the invite code and send it with your email app.');
+    });
+  }
+
+  async function copyInviteCode() {
+    if (!pendingInvite) return;
+    await Clipboard.setStringAsync(pendingInvite.token);
+  }
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={onBack} style={styles.back}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Invite a member</Text>
-      <Text style={styles.subtitle}>They'll receive a token to join your family.</Text>
+      <View style={[styles.body, { paddingTop: spacing.lg }]}>
+      <Text style={styles.subtitle}>
+        Kin does not email them automatically—we save their email so it must match their account. Share the code
+        using the buttons below.
+      </Text>
 
       <TextInput
         style={styles.input}
         placeholder="Email address"
-        placeholderTextColor="#6B7280"
+        placeholderTextColor={t.textSecondary}
         value={email}
-        onChangeText={(v) => { setEmail(v); setInviteToken(null); setError(null); }}
+        onChangeText={(v) => { setEmail(v); setPendingInvite(null); setError(null); }}
         keyboardType="email-address"
         autoCapitalize="none"
         editable={!loading}
@@ -89,11 +132,22 @@ export function InviteMemberScreen({ onBack }: Props) {
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
-      {inviteToken && (
+      {pendingInvite && (
         <View style={styles.tokenBox}>
-          <Text style={styles.tokenLabel}>Share this code with your invitee:</Text>
-          <Text style={styles.tokenValue} selectable>{inviteToken}</Text>
-          <Text style={styles.tokenHint}>They enter this in "Have an invite code? Join instead"</Text>
+          <Text style={styles.tokenLabel}>Invite code</Text>
+          <Text style={styles.tokenValue} selectable>{pendingInvite.token}</Text>
+          <Text style={styles.tokenHint}>They enter this in &quot;Have an invite code? Join instead&quot;</Text>
+          <View style={styles.inviteActions}>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={shareInvite}>
+              <Text style={styles.secondaryBtnText}>Share…</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={emailInvite}>
+              <Text style={styles.secondaryBtnText}>Email invite</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={copyInviteCode}>
+              <Text style={styles.secondaryBtnText}>Copy code</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -103,122 +157,130 @@ export function InviteMemberScreen({ onBack }: Props) {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={t.surface} />
         ) : (
-          <Text style={styles.buttonText}>Send Invite</Text>
+          <Text style={styles.buttonText}>Create invite</Text>
         )}
       </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9F7F4',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-  },
-  back: {
-    marginBottom: 24,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#4F6BED',
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 32,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1A2E',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A2E',
-    marginBottom: 10,
-  },
-  roleRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  roleChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  roleChipActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#4F6BED',
-  },
-  roleChipText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  roleChipTextActive: {
-    color: '#4F6BED',
-    fontWeight: '600',
-  },
-  error: {
-    color: '#EF4444',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  tokenBox: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  tokenLabel: {
-    fontSize: 13,
-    color: '#4F6BED',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  tokenValue: {
-    fontSize: 13,
-    color: '#1A1A2E',
-    fontFamily: 'monospace' as const,
-    marginBottom: 8,
-  },
-  tokenHint: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  button: {
-    backgroundColor: '#4F6BED',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    body: {
+      flex: 1,
+      paddingHorizontal: spacing.xxl,
+    },
+    subtitle: {
+      ...typography.subhead,
+      fontWeight: '400',
+      color: t.textSecondary,
+      marginBottom: spacing.xxxl,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: radius.lg,
+      padding: spacing.md + 2,
+      fontSize: 16,
+      color: t.text,
+      backgroundColor: t.surface,
+      marginBottom: spacing.xl,
+    },
+    label: {
+      ...typography.callout,
+      fontWeight: '600',
+      color: t.text,
+      marginBottom: spacing.sm + 2,
+    },
+    roleRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing.xxl,
+    },
+    roleChip: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
+    roleChipActive: {
+      backgroundColor: t.accentLight,
+      borderColor: t.accent,
+    },
+    roleChipText: {
+      ...typography.callout,
+      color: t.textSecondary,
+    },
+    roleChipTextActive: {
+      color: t.accent,
+      fontWeight: '600',
+    },
+    error: {
+      color: t.error,
+      fontSize: 14,
+      marginBottom: spacing.md,
+    },
+    tokenBox: {
+      backgroundColor: t.accentLight,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    tokenLabel: {
+      ...typography.caption,
+      fontWeight: '600',
+      color: t.accent,
+      marginBottom: spacing.sm,
+    },
+    tokenValue: {
+      fontSize: 13,
+      color: t.text,
+      fontFamily: 'monospace' as const,
+      marginBottom: spacing.sm,
+    },
+    tokenHint: {
+      ...typography.footnote,
+      color: t.textSecondary,
+    },
+    inviteActions: {
+      marginTop: spacing.md,
+      gap: spacing.sm,
+    },
+    secondaryBtn: {
+      paddingVertical: spacing.sm + 2,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: t.accent,
+      alignItems: 'center',
+    },
+    secondaryBtnText: {
+      ...typography.callout,
+      color: t.accent,
+      fontWeight: '600',
+    },
+    button: {
+      backgroundColor: t.accent,
+      borderRadius: radius.xxl - 4,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonText: {
+      color: t.surface,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+  });
+}

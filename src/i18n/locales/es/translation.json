@@ -1,0 +1,172 @@
+{
+  "language": {
+    "screenTitle": "Idioma",
+    "rowLabel": "Idioma",
+    "rowSublabel": "Idioma de la app o el del dispositivo",
+    "hint": "Elige cómo debe mostrar Kin el texto. «Sistema» usa el idioma del dispositivo en cada inicio cuando lo admitimos.",
+    "optionSystem": "Sistema",
+    "optionMatchDevice": "Igual que el dispositivo",
+    "optionEnglish": "Inglés",
+    "optionSpanish": "Español",
+    "optionFrench": "Francés",
+    "optionGerman": "Alemán",
+    "optionJapanese": "Japonés",
+    "optionChineseSimplified": "Chino (simplificado)"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "edit": "Editar"
+  },
+  "settings": {
+    "sections": {
+      "account": "Cuenta",
+      "family": "Familia",
+      "preferences": "Preferencias",
+      "privacy": "Privacidad y datos",
+      "about": "Acerca de"
+    },
+    "profile": { "displayNamePlaceholder": "Nombre para mostrar" },
+    "family": {
+      "nameLabel": "Nombre de la familia",
+      "namePlaceholder": "Nombre de la familia",
+      "caringForLabel": "Cuidado de",
+      "recipientPlaceholder": "Nombre de la persona a cuidar"
+    },
+    "preferences": {
+      "appearance": "Apariencia",
+      "appearanceSub": "Claro, oscuro o según el dispositivo",
+      "language": "Idioma",
+      "languageSub": "Idioma de la app o el del dispositivo",
+      "notifications": "Notificaciones",
+      "notificationsSub": "Notificaciones push y recordatorios",
+      "accessibility": "Accesibilidad",
+      "accessibilitySub": "Háptica; las transiciones siguen Reducir movimiento del sistema cuando está disponible"
+    },
+    "privacy": {
+      "dataPrivacy": "Datos y privacidad",
+      "dataPrivacySub": "Borrar historial de Visit Prep o registros de salud (solo administradores)",
+      "export": "Exportar datos de la familia",
+      "exportSub": "Compartir exportación de texto con tareas, medicamentos, registros y más",
+      "exporting": "Preparando exportación…",
+      "deleteAccount": "Eliminar cuenta",
+      "deleteAccountSub": "Quita tu acceso y programa el borrado de datos"
+    },
+    "about": {
+      "version": "Versión",
+      "sendFeedback": "Enviar comentarios",
+      "privacyPolicy": "Política de privacidad",
+      "terms": "Términos del servicio"
+    },
+    "signOut": "Cerrar sesión",
+    "footerTagline": "Kin · Coordinación del cuidado familiar",
+    "alerts": {
+      "saveFailedTitle": "No se pudo guardar",
+      "saveFailedMessage": "Inténtalo de nuevo.",
+      "exportFailedTitle": "Exportación fallida",
+      "exportFailedMessage": "No se pudieron exportar los datos. Inténtalo de nuevo.",
+      "deleteTitle": "Eliminar cuenta",
+      "deleteMessage": "Esto quitará tu acceso a esta familia y cerrará tu sesión. Tus datos se eliminarán de forma permanente en un plazo de 30 días.\n\nNo se puede deshacer.",
+      "deleteConfirm": "Eliminar mi cuenta",
+      "signOutTitle": "Cerrar sesión",
+      "signOutMessage": "¿Seguro que quieres cerrar sesión?",
+      "signOutConfirm": "Cerrar sesión"
+    },
+    "export": {
+      "shareTitle": "Exportación Kin — {{name}}",
+      "title": "KIN — EXPORTACIÓN DE DATOS FAMILIARES",
+      "familyLine": "Familia: {{name}}",
+      "caringLine": "Cuidado de: {{name}}",
+      "sectionTasks": "TAREAS ({{count}})",
+      "sectionMedications": "MEDICAMENTOS ({{count}})",
+      "sectionHealth": "REGISTRO DE SALUD ({{count}} entradas)",
+      "sectionCalendar": "EVENTOS DEL CALENDARIO ({{count}})",
+      "sectionCheckins": "CHECK-INS ({{count}})",
+      "taskDue": "  [vence {{date}}]",
+      "healthPhoto": "  [foto archivada]",
+      "calendarAt": "  @ {{location}}"
+    }
+  },
+  "auth": {
+    "brand": { "name": "Kin", "tagline": "Cuidado, coordinado." },
+    "signIn": {
+      "title": "Bienvenido de nuevo",
+      "email": "Correo",
+      "password": "Contraseña",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Iniciar sesión",
+      "noAccount": "¿No tienes cuenta? ",
+      "create": "Crear una"
+    },
+    "signUp": {
+      "createTitle": "Crea tu cuenta",
+      "step1of2": "Paso 1 de 2",
+      "fullName": "Nombre completo",
+      "namePlaceholder": "María García",
+      "email": "Correo",
+      "password": "Contraseña",
+      "passwordHint": "Al menos 8 caracteres",
+      "continue": "Continuar",
+      "inviteTitle": "Invita a tu familia",
+      "step2of2": "Paso 2 de 2",
+      "inviteBody": "Kin funciona mejor cuando quienes ayudan día a día están en el mismo espacio. Tras registrarte puedes enviar invitaciones seguras desde Miembros: cada persona se une con su propia cuenta.",
+      "createAccount": "Crear cuenta",
+      "editDetails": "Editar datos",
+      "hasAccount": "¿Ya tienes cuenta? ",
+      "signInLink": "Iniciar sesión",
+      "successTitle": "Revisa tu correo",
+      "successDesc": "Enviamos un enlace de confirmación a {{email}}. Ábrelo para activar tu cuenta. Si no llega en unos minutos, revisa spam o Promociones.",
+      "goSignIn": "Ir a iniciar sesión",
+      "errors": {
+        "allFields": "Completa todos los campos.",
+        "passwordLength": "La contraseña debe tener al menos 8 caracteres.",
+        "duplicateEmail": "Ese correo ya tiene una cuenta. Prueba iniciar sesión o elimina el usuario en Supabase → Authentication → Users."
+      }
+    },
+    "welcome": {
+      "skip": "Omitir",
+      "next": "Siguiente",
+      "getStarted": "Empezar",
+      "slide1Headline": "Organiza el cuidado.",
+      "slide1Body": "Medicamentos, tareas y citas en un solo lugar tranquilo.",
+      "slide2Headline": "Comparte novedades.",
+      "slide2Body": "Check-ins y notas para que todos sepan cómo va el día.",
+      "slide3Headline": "Mantén el rumbo.",
+      "slide3Body": "Un espacio compartido para familia y cuidadores, sin caos de grupos."
+    }
+  },
+  "home": {
+    "caringFor": "Cuidado de {{name}}",
+    "a11ySettings": "Ajustes",
+    "a11yMembers": "Miembros",
+    "a11yDocuments": "Documentos",
+    "needsAttention": "Requiere atención",
+    "browseHide": "Ocultar secciones",
+    "browseShow": "Ver todas las secciones",
+    "allClearTitle": "Todo en orden",
+    "allClearSub": "Hoy está todo al día",
+    "attention": {
+      "overdueTasks_one": "{{count}} tarea requiere atención",
+      "overdueTasks_other": "{{count}} tareas requieren atención",
+      "medDoses_one": "{{count}} dosis sin registrar",
+      "medDoses_other": "{{count}} dosis sin registrar",
+      "eventsSingle": "{{title}} hoy",
+      "eventsMulti": "{{title}} +{{extra}} más hoy",
+      "checkIn": "Registrar el check-in de hoy",
+      "healthLog": "Añadir entrada al registro de salud"
+    },
+    "nav": {
+      "tasks": { "label": "Tareas", "desc": "Pendientes y asignaciones" },
+      "calendar": { "label": "Calendario", "desc": "Citas y eventos" },
+      "visitprep": { "label": "Prep. visita", "desc": "Resumen de visita médica con IA" },
+      "doctors": { "label": "Médicos", "desc": "Equipo y contactos" },
+      "medications": { "label": "Medicamentos", "desc": "Horarios y dosis" },
+      "health": { "label": "Salud", "desc": "Síntomas y constantes" },
+      "checkins": { "label": "Check-ins", "desc": "Estado diario" },
+      "documents": { "label": "Documentos", "desc": "Archivos médicos y legales" },
+      "notes": { "label": "Notas", "desc": "Novedades familiares" },
+      "members": { "label": "Miembros", "desc": "Familia y cuidadores" }
+    }
+  }
+}
