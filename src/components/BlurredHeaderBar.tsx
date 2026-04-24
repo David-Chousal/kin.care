@@ -5,7 +5,7 @@ import { HeaderFrostedBackdrop } from './HeaderFrostedBackdrop';
 
 /**
  * Frosted header strip (blur + content). Uses the same `HeaderFrostedBackdrop` as native-stack
- * and `ScreenHeader` (blur or accessibility fallback).
+ * and `ScreenHeader` (live blur when allowed, otherwise opaque `surface` for contrast).
  */
 export function BlurredHeaderBar({
   children,

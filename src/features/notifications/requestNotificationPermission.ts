@@ -1,5 +1,6 @@
 import { Alert, Linking, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { ensureAndroidNotificationChannels } from './ensureAndroidNotificationChannels';
 import { useNotificationPrefs } from '../../store/notifications';
 
 /**
@@ -74,6 +75,8 @@ export async function requestNotificationPermission(
   });
 
   if (!proceed) return false;
+
+  await ensureAndroidNotificationChannels();
 
   const { status: next } = await Notifications.requestPermissionsAsync();
   // Record that the OS dialog was shown and the resulting status.

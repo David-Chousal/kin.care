@@ -184,6 +184,13 @@ create table public.profiles (
   created_at  timestamptz default now()
 );
 
+comment on column public.profiles.avatar_url is
+  'Object path inside bucket profile-avatars ({user_id}/filename).';
+
+alter table public.profiles add constraint profiles_avatar_storage_path check (
+  avatar_url is null or split_part(avatar_url, '/', 1) = id::text
+);
+
 -- 2. Families
 create table public.families (
   id                   uuid primary key default gen_random_uuid(),
@@ -225,8 +232,10 @@ create table public.invitations (
   role       text not null default 'member' check (role in ('admin', 'member', 'viewer')),
   token      uuid not null default gen_random_uuid(),
   accepted   boolean not null default false,
+  expires_at timestamptz not null default (now() + interval '7 days'),
   created_at timestamptz default now(),
-  unique (family_id, email)
+  unique (family_id, email),
+  constraint invitations_expires_after_created_chk check (expires_at > created_at)
 );
 
 -- ============================================================
@@ -319,10 +328,36 @@ create policy "admins can manage membership"
     )
   );
 
--- Allow first member insert (family creator)
-create policy "creator can insert themselves"
+-- First member row for a newly created family (creator only; not a blanket self-insert).
+create policy "family creator can insert self as first member"
   on public.family_members for insert
-  with check (user_id = auth.uid());
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.families f
+      where f.id = family_members.family_id
+        and f.created_by = auth.uid()
+    )
+    and not exists (
+      select 1 from public.family_members fm
+      where fm.family_id = family_members.family_id
+    )
+  );
+
+-- Join via pending invitation: enforced server-side (expiry, email, role).
+create policy "invitee can join via valid invitation"
+  on public.family_members for insert
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.invitations i
+      where i.family_id = family_members.family_id
+        and i.accepted = false
+        and i.expires_at > now()
+        and lower(btrim(i.email)) = lower(btrim((select p.email from public.profiles p where p.id = auth.uid())))
+        and i.role = family_members.role
+    )
+  );
 
 -- Tasks: visible and editable by family members
 create policy "family members can view tasks"
@@ -346,6 +381,13 @@ create policy "family members can view invitations"
   on public.invitations for select
   using (public.is_family_member(family_id));
 
+create policy "invitee can view own pending invitations"
+  on public.invitations for select
+  using (
+    accepted = false
+    and lower(btrim(email)) = lower(btrim((select p.email from public.profiles p where p.id = auth.uid())))
+  );
+
 create policy "admins can create invitations"
   on public.invitations for insert
   with check (
@@ -357,4 +399,58 @@ create policy "admins can create invitations"
 
 create policy "invitee can accept invitation"
   on public.invitations for update
-  using (email = (select email from public.profiles where id = auth.uid()));
+  using (
+    email = (select p.email from public.profiles p where p.id = auth.uid())
+    and accepted = false
+    and expires_at > now()
+  )
+  with check (
+    email = (select p.email from public.profiles p where p.id = auth.uid())
+    and accepted = true
+  );
+
+-- ============================================================
+-- Storage: profile avatars (see supabase/migrations/20260424100000_profile_avatars.sql)
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'profile-avatars',
+  'profile-avatars',
+  true,
+  3145728,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']
+)
+on conflict (id) do nothing;
+
+drop policy if exists "profile avatars select" on storage.objects;
+create policy "profile avatars select"
+  on storage.objects for select
+  using (
+    bucket_id = 'profile-avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
+drop policy if exists "profile avatars insert" on storage.objects;
+create policy "profile avatars insert"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'profile-avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
+drop policy if exists "profile avatars update" on storage.objects;
+create policy "profile avatars update"
+  on storage.objects for update
+  using (
+    bucket_id = 'profile-avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
+drop policy if exists "profile avatars delete" on storage.objects;
+create policy "profile avatars delete"
+  on storage.objects for delete
+  using (
+    bucket_id = 'profile-avatars'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );

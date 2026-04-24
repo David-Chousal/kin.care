@@ -3,7 +3,10 @@ import { supabase } from '../../../lib/supabase';
 import { useFamilyStore } from '../../../store/family';
 import type { Document, DocumentCategory } from '../../../types';
 
-const BUCKET = 'documents';
+export const DOCUMENTS_BUCKET = 'documents';
+
+/** Short-lived signed URLs for opening files; do not use getPublicUrl for this bucket. */
+export const DOCUMENTS_SIGNED_URL_EXPIRY_SEC = 300;
 
 export function useDocuments() {
   const family = useFamilyStore((s) => s.family);
@@ -44,7 +47,7 @@ export function useUploadDocument() {
       const blob = await response.blob();
 
       const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
+        .from(DOCUMENTS_BUCKET)
         .upload(filePath, blob, { contentType: input.fileType });
       if (uploadError) throw uploadError;
 
@@ -65,22 +68,21 @@ export function useUploadDocument() {
   });
 }
 
-export function useDocumentUrl(filePath: string) {
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
-}
-
 export function useDeleteDocument() {
   const queryClient = useQueryClient();
   const family = useFamilyStore((s) => s.family);
 
   return useMutation({
     mutationFn: async ({ id, filePath }: { id: string; filePath: string }) => {
-      await supabase.storage.from(BUCKET).remove([filePath]);
+      const { error: storageError } = await supabase.storage.from(DOCUMENTS_BUCKET).remove([filePath]);
+      if (storageError) throw storageError;
       const { error } = await supabase.from('documents').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', family?.id] });
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ['documents', family?.id] });
     },
   });

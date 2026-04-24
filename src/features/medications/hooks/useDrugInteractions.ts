@@ -1,5 +1,11 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { checkFamilyInteractions, type MedicationInteractionResult } from '../services/drugInteractionService';
+import {
+  checkFamilyInteractions,
+  worstSeverityByInteractionDrugName,
+  type InteractionSeverity,
+  type MedicationInteractionResult,
+} from '../services/drugInteractionService';
 import type { Medication } from '../../../types';
 
 /**
@@ -11,6 +17,8 @@ import type { Medication } from '../../../types';
 export function useFamilyInteractionWarnings(medications: Medication[] | undefined): {
   interactions: MedicationInteractionResult[];
   interactingNames: Set<string>;
+  /** Lowercased drug names as returned by interaction sources → worst severity on that drug. */
+  severityByDrugName: Map<string, InteractionSeverity>;
   isLoading: boolean;
 } {
   const meds = medications ?? [];
@@ -28,9 +36,11 @@ export function useFamilyInteractionWarnings(medications: Medication[] | undefin
   });
 
   const interactions = query.data ?? [];
-  const interactingNames = new Set(
-    interactions.flatMap((r) => [r.medicationName1.toLowerCase(), r.medicationName2.toLowerCase()]),
+  const severityByDrugName = useMemo(
+    () => worstSeverityByInteractionDrugName(interactions),
+    [interactions],
   );
+  const interactingNames = useMemo(() => new Set(severityByDrugName.keys()), [severityByDrugName]);
 
-  return { interactions, interactingNames, isLoading: query.isLoading };
+  return { interactions, interactingNames, severityByDrugName, isLoading: query.isLoading };
 }

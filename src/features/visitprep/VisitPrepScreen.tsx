@@ -19,6 +19,8 @@ import {
   Dimensions,
   Easing,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import { Toast } from '../../components/Toast';
 import { useVisitPrep } from './useVisitPrep';
@@ -26,38 +28,26 @@ import { useDeleteVisitPrepSummary, useUpdateVisitPrepSummaryDisplayName } from 
 import { useFamilyStore } from '../../store/family';
 import { useAuthStore } from '../../store/auth';
 import { useMembers } from '../family/hooks/useMembers';
-import { useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { AiHealthDisclaimer } from '../../components/AiHealthDisclaimer';
+import { useState, useRef, useLayoutEffect, useCallback, useEffect } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useReduceMotion } from '../../navigation/useReduceMotion';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useTheme, spacing, type Theme } from '../../theme';
+import { useTheme, spacing } from '../../theme';
 import type { VisitPrepSummary } from '../../types';
-
-function renderMarkdown(text: string, theme: Theme) {
-  return text.split('\n').map((line, i) => {
-    if (/^\*\*(.+)\*\*$/.test(line)) {
-      return <Text key={i} style={[styles.heading, { color: theme.text }]}>{line.replace(/\*\*/g, '')}</Text>;
-    }
-    if (/^\d+\.\s\*\*(.+)\*\*/.test(line)) {
-      const num = line.match(/^\d+/)?.[0];
-      const label = line.replace(/^\d+\.\s\*\*/, '').replace(/\*\*.*$/, '');
-      return <Text key={i} style={[styles.sectionTitle, { color: theme.accent }]}>{num}. {label}</Text>;
-    }
-    if (/^#{1,3}\s/.test(line)) {
-      return <Text key={i} style={[styles.heading, { color: theme.text }]}>{line.replace(/^#{1,3}\s/, '')}</Text>;
-    }
-    if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
-      return <Text key={i} style={[styles.bullet, { color: theme.textSecondary }]}>{'  •  '}{line.replace(/^[-•*]\s/, '')}</Text>;
-    }
-    if (line.trim() === '') return <View key={i} style={{ height: 8 }} />;
-    return <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>{line}</Text>;
-  });
-}
+import type { MainStackParamList } from '../../navigation/types';
+import { useEffectiveTier } from '../../subscription/useEffectiveTier';
+import { featureUnlocked } from '../../subscription/featureTierConfig';
+import { FeatureLockedCallout } from '../../subscription/FeatureLockedCallout';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
+import { renderMinimalMarkdown } from '../../lib/renderMinimalMarkdown';
+import { Sentry } from '../../lib/sentry';
 
 type MainTab = 'summary' | 'history';
 
-function formatGeneratedLabel(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
+function formatGeneratedLabel(iso: string, localeTag: string) {
+  return new Date(iso).toLocaleDateString(localeTag, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -81,18 +71,13 @@ function canEditVisitPrepSummary(
   return !!userId && (item.created_by === userId || isFamilyAdmin);
 }
 
-function historyTroubleshootHint(message: string): string | null {
+function historyTroubleshootHint(message: string, t: (key: string) => string): string | null {
   const m = message.toLowerCase();
   if (m.includes('schema cache') || m.includes('pgrst205') || m.includes('pgrst204')) {
-    return [
-      'PostgREST has not picked up visit_prep_summaries yet. Try in order:',
-      '1) Supabase Dashboard → SQL → run the file supabase/migrations/20260421140000_visit_prep_summaries.sql (creates table, RLS policies, NOTIFY).',
-      '2) Wait ~1 minute, then pull to refresh here.',
-      '3) If it still fails: Dashboard → Project Settings → General → Pause project, then Resume (forces API reload).',
-    ].join('\n');
+    return t('visitPrep.troubleshoot.postgrest');
   }
   if (m.includes('does not exist') || m.includes('relation') || m.includes('42p01')) {
-    return 'Add the visit_prep_summaries table to your Supabase database (see .claude/schema.sql), then try again.';
+    return t('visitPrep.troubleshoot.missingRelation');
   }
   return null;
 }
@@ -100,7 +85,10 @@ function historyTroubleshootHint(message: string): string | null {
 const SCREEN_W = Dimensions.get('window').width;
 
 export function VisitPrepScreen() {
-  const t = useTheme();
+  const theme = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { data: tier = 'free' } = useEffectiveTier();
+  const visitPrepLocked = !featureUnlocked(tier, 'ai_visit_prep');
   const headerHeight = useHeaderHeight();
   const reduceMotion = useReduceMotion();
   const family = useFamilyStore((s) => s.family);
@@ -111,17 +99,25 @@ export function VisitPrepScreen() {
   const isFamilyAdmin = members.some((m) => m.user_id === user?.id && m.role === 'admin');
   const {
     summary,
+    summaryId,
     generatedAt,
     isLoading,
     error,
+    subscriptionBlocked,
     persistError,
     generate,
     history,
     historyLoading,
+    historyError,
     historyErrorMessage,
     historyIsFetching,
     refetchHistory,
   } = useVisitPrep();
+  const { t } = useTranslation();
+  const localeTag = useFormatLocaleTag();
+  const visitPrepExportPrefixText = useCallback(() => {
+    return [t('visitPrep.export.line1'), t('visitPrep.export.line2'), ''].join('\n');
+  }, [t]);
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [mainTab, setMainTab] = useState<MainTab>('summary');
   const [historyDetail, setHistoryDetail] = useState<VisitPrepSummary | null>(null);
@@ -245,8 +241,8 @@ export function VisitPrepScreen() {
 
   async function handleCopy(text: string) {
     if (!text) return;
-    await Clipboard.setStringAsync(text);
-    setToast({ visible: true, message: 'Copied to clipboard' });
+    await Clipboard.setStringAsync(visitPrepExportPrefixText() + text);
+    setToast({ visible: true, message: t('visitPrep.toastCopied') });
   }
 
   function closeSummaryMenu() {
@@ -255,21 +251,21 @@ export function VisitPrepScreen() {
 
   function confirmDeleteSummary(item: VisitPrepSummary) {
     Alert.alert(
-      'Delete this summary?',
-      'This cannot be undone.',
+      t('visitPrep.deleteConfirmTitle'),
+      t('visitPrep.deleteConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('visitPrep.delete'),
           style: 'destructive',
           onPress: () => {
             deleteSummary.mutate(item.id, {
               onSuccess: () => {
                 if (historyDetailRef.current?.id === item.id) closeHistoryDetail();
-                setToast({ visible: true, message: 'Summary deleted' });
+                setToast({ visible: true, message: t('visitPrep.toastSummaryDeleted') });
               },
               onError: (e) => {
-                Alert.alert('Could not delete', e instanceof Error ? e.message : 'Unknown error');
+                Alert.alert(t('visitPrep.couldNotDelete'), e instanceof Error ? e.message : t('visitPrep.unknownError'));
               },
             });
           },
@@ -290,30 +286,31 @@ export function VisitPrepScreen() {
   async function exportSummaryText(content: string) {
     const trimmed = (content ?? '').trim();
     if (!trimmed) {
-      setToast({ visible: true, message: 'Nothing to export' });
+      setToast({ visible: true, message: t('visitPrep.toastNothingToExport') });
       return;
     }
+    const withPrefix = (visitPrepExportPrefixText() + trimmed).trim();
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-          await navigator.share({ text: trimmed, title: 'Visit prep summary' });
+          await navigator.share({ text: withPrefix, title: t('visitPrep.shareTitle') });
         } else {
-          await Clipboard.setStringAsync(trimmed);
-          setToast({ visible: true, message: 'Copied (browser share not available)' });
+          await Clipboard.setStringAsync(withPrefix);
+          setToast({ visible: true, message: t('visitPrep.toastCopiedBrowser') });
         }
         return;
       }
       await Share.share(
         Platform.OS === 'ios'
-          ? { message: trimmed }
-          : { message: trimmed, title: 'Visit prep summary' }
+          ? { message: withPrefix }
+          : { message: withPrefix, title: t('visitPrep.shareTitle') }
       );
     } catch {
       try {
-        await Clipboard.setStringAsync(trimmed);
-        setToast({ visible: true, message: 'Share unavailable — copied to clipboard instead' });
+        await Clipboard.setStringAsync(withPrefix);
+        setToast({ visible: true, message: t('visitPrep.toastShareFallback') });
       } catch {
-        setToast({ visible: true, message: 'Could not share or copy' });
+        setToast({ visible: true, message: t('visitPrep.toastShareCopyFailed') });
       }
     }
   }
@@ -334,11 +331,11 @@ export function VisitPrepScreen() {
           setRenameDraft('');
           setToast({
             visible: true,
-            message: display_name ? 'Name updated' : 'Custom name removed',
+            message: display_name ? t('visitPrep.toastNameUpdated') : t('visitPrep.toastNameCleared'),
           });
         },
         onError: (e) => {
-          Alert.alert('Could not save', e instanceof Error ? e.message : 'Unknown error');
+          Alert.alert(t('visitPrep.couldNotSave'), e instanceof Error ? e.message : t('visitPrep.unknownError'));
         },
       }
     );
@@ -351,78 +348,134 @@ export function VisitPrepScreen() {
         onPress={() => goTab(tab)}
         style={[
           styles.tabPill,
-          { backgroundColor: active ? t.accent : t.surface, borderColor: active ? t.accent : t.borderLight },
+          { backgroundColor: active ? theme.accent : theme.surface, borderColor: active ? theme.accent : theme.borderLight },
         ]}
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
       >
-        <Text style={[styles.tabPillText, { color: active ? '#FFFFFF' : t.textSecondary }]}>{label}</Text>
+        <Text style={[styles.tabPillText, { color: active ? '#FFFFFF' : theme.textSecondary }]}>{label}</Text>
       </TouchableOpacity>
     );
   }
 
   const summaryDateLabel =
-    generatedAt != null ? formatGeneratedLabel(generatedAt) : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    generatedAt != null
+      ? formatGeneratedLabel(generatedAt, localeTag)
+      : new Date().toLocaleDateString(localeTag, { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const historyHint = historyErrorMessage ? historyTroubleshootHint(historyErrorMessage) : null;
+  const showHistoryDebug = __DEV__ && !!historyErrorMessage;
+  const historyHint = showHistoryDebug && historyErrorMessage ? historyTroubleshootHint(historyErrorMessage, t) : null;
+
+  useEffect(() => {
+    if (!historyError) return;
+    if (__DEV__) {
+      console.error('[VisitPrep] history query failed', historyError);
+      return;
+    }
+    if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+      Sentry.captureException(historyError, {
+        tags: { flow: 'visit_prep' },
+        extra: { stage: 'history_query' },
+      });
+    } else {
+      console.warn('[VisitPrep] history query failed (no DSN)', historyError);
+    }
+  }, [historyError]);
 
   const summaryContent = (
     <>
-      <View style={[styles.intro, { backgroundColor: t.surface }]}>
-        <MaterialCommunityIcons name="stethoscope" size={40} color={t.accent} />
-        <Text style={[styles.introTitle, { color: t.text }]}>AI Visit Summary</Text>
-        <Text style={[styles.introDesc, { color: t.textSecondary }]}>
-          Generates a doctor visit prep sheet from{' '}
-          <Text style={[styles.introName, { color: t.accent }]}>{family?.care_recipient_name}'s</Text>{' '}
-          last 30 days of health logs and current medications. Each run is saved under History.
+      <View style={[styles.intro, { backgroundColor: theme.surface }]}>
+        <MaterialCommunityIcons name="stethoscope" size={40} color={theme.accent} />
+        <Text style={[styles.introTitle, { color: theme.text }]}>{t('visitPrep.introTitle')}</Text>
+        <Text style={[styles.introDesc, { color: theme.textSecondary }]}>
+          <Trans
+            i18nKey="visitPrep.introFull"
+            values={{ name: family?.care_recipient_name ?? '' }}
+            components={[<Text key="0" style={[styles.introName, { color: theme.accent }]} />]}
+          />
         </Text>
+        <View style={{ width: '100%', marginTop: 10 }}>
+          <AiHealthDisclaimer kind="visit_prep" />
+        </View>
       </View>
 
+      {visitPrepLocked ? (
+        <FeatureLockedCallout
+          featureId="ai_visit_prep"
+          currentTier={tier}
+          onUpgrade={() => navigation.navigate('Subscription', { featureId: 'ai_visit_prep' })}
+          showNativePurchaseCta={Platform.OS !== 'web'}
+        />
+      ) : null}
+
       {persistError ? (
-        <View style={[styles.persistBanner, { backgroundColor: t.errorSurface, borderColor: t.error }]}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={20} color={t.error} />
-          <Text style={[styles.persistBannerText, { color: t.error }]}>{persistError}</Text>
+        <View style={[styles.persistBanner, { backgroundColor: theme.errorSurface, borderColor: theme.error }]}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={20} color={theme.error} />
+          <Text style={[styles.persistBannerText, { color: theme.error }]}>{persistError}</Text>
         </View>
       ) : null}
 
-      {!summary && !isLoading && !error ? (
-        <TouchableOpacity style={[styles.generateBtn, { backgroundColor: t.accent }]} onPress={generate}>
-          <Text style={styles.generateBtnText}>Generate Visit Summary</Text>
+      {!visitPrepLocked && !summary && !isLoading && !error ? (
+        <TouchableOpacity
+          style={[styles.generateBtn, { backgroundColor: theme.accent }]}
+          onPress={() => {
+            if (__DEV__) console.warn('[VisitPrep] generate pressed');
+            void generate().catch((e) => {
+              if (__DEV__) console.warn('[VisitPrep] generate rejected', e);
+            });
+          }}
+        >
+          <Text style={styles.generateBtnText}>{t('visitPrep.generateCta')}</Text>
         </TouchableOpacity>
       ) : null}
 
       {isLoading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={t.accent} size="large" />
-          <Text style={[styles.loadingText, { color: t.textSecondary }]}>Analyzing health data…</Text>
+          <ActivityIndicator color={theme.accent} size="large" />
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>{t('visitPrep.analyzing')}</Text>
         </View>
       ) : null}
 
       {error ? (
-        <View style={[styles.errorBox, { backgroundColor: t.errorSurface }]}>
-          <Text style={[styles.errorText, { color: t.error }]}>{error}</Text>
-          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: t.error }]} onPress={generate}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
+        <View style={[styles.errorBox, { backgroundColor: theme.errorSurface }]}>
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 12 }}>
+            {subscriptionBlocked ? (
+              <TouchableOpacity
+                style={[styles.retryBtn, { backgroundColor: theme.accent }]}
+                onPress={() => navigation.navigate('Subscription', { featureId: 'ai_visit_prep' })}
+              >
+                <Text style={styles.retryText}>{t('visitPrep.viewPlans')}</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: theme.error }]} onPress={generate}>
+              <Text style={styles.retryText}>{t('visitPrep.tryAgain')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
 
       {summary ? (
-        <View style={[styles.summaryBox, { backgroundColor: t.surface }]}>
+        <View style={[styles.summaryBox, { backgroundColor: theme.surface }]}>
           <View style={styles.summaryHeader}>
-            <Text style={[styles.summaryDate, { color: t.textTertiary }]}>Generated {summaryDateLabel}</Text>
+            <Text style={[styles.summaryDate, { color: theme.textTertiary }]}>
+              {t('visitPrep.generatedPrefix', { date: summaryDateLabel })}
+            </Text>
             <View style={styles.summaryActions}>
               <TouchableOpacity onPress={() => handleCopy(summary)} style={styles.actionBtn}>
-                <MaterialCommunityIcons name="content-copy" size={14} color={t.accent} />
-                <Text style={[styles.refreshText, { color: t.accent }]}>Copy</Text>
+                <MaterialCommunityIcons name="content-copy" size={14} color={theme.accent} />
+                <Text style={[styles.refreshText, { color: theme.accent }]}>{t('visitPrep.copy')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={generate} style={styles.actionBtn}>
-                <MaterialCommunityIcons name="refresh" size={14} color={t.accent} />
-                <Text style={[styles.refreshText, { color: t.accent }]}>Refresh</Text>
-              </TouchableOpacity>
+              {!visitPrepLocked ? (
+                <TouchableOpacity onPress={generate} style={styles.actionBtn}>
+                  <MaterialCommunityIcons name="refresh" size={14} color={theme.accent} />
+                  <Text style={[styles.refreshText, { color: theme.accent }]}>{t('visitPrep.refresh')}</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
-          {renderMarkdown(summary, t)}
+          <AiHealthDisclaimer kind="visit_prep" />
+          {renderMinimalMarkdown(summary, theme, summaryId, 'visitPrep')}
         </View>
       ) : null}
     </>
@@ -435,31 +488,38 @@ export function VisitPrepScreen() {
       keyExtractor={(item) => item.id}
       contentContainerStyle={[styles.historyListContent, history.length === 0 && styles.historyListEmpty]}
       refreshControl={
-        <RefreshControl refreshing={historyIsFetching} onRefresh={() => void refetchHistory()} tintColor={t.accent} />
+        <RefreshControl refreshing={historyIsFetching} onRefresh={() => void refetchHistory()} tintColor={theme.accent} />
       }
       ListEmptyComponent={
         historyLoading ? (
           <View style={styles.historyLoadingOnly}>
-            <ActivityIndicator color={t.accent} size="large" />
-            <Text style={[styles.loadingText, { color: t.textSecondary }]}>Loading history…</Text>
+            <ActivityIndicator color={theme.accent} size="large" />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>{t('visitPrep.loadingHistory')}</Text>
           </View>
         ) : historyErrorMessage ? (
-          <View style={[styles.errorBox, { backgroundColor: t.errorSurface }]}>
-            <Text style={[styles.errorText, { color: t.error }]}>{historyErrorMessage}</Text>
-            {historyHint ? <Text style={[styles.hintText, { color: t.textSecondary }]}>{historyHint}</Text> : null}
-            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: t.error }]} onPress={() => void refetchHistory()}>
-              <Text style={styles.retryText}>Retry</Text>
+          <View style={[styles.errorBox, { backgroundColor: theme.errorSurface }]}>
+            <Text style={[styles.errorText, { color: theme.error }]}>
+              {t('visitPrep.historyLoadError')}
+            </Text>
+            {showHistoryDebug ? (
+              <Text style={[styles.hintText, { color: theme.textSecondary }]}>
+                {historyErrorMessage}
+                {historyHint ? `\n\n${historyHint}` : ''}
+              </Text>
+            ) : null}
+            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: theme.error }]} onPress={() => void refetchHistory()}>
+              <Text style={styles.retryText}>{t('visitPrep.tryAgain')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.emptyHistory}>
-            <MaterialCommunityIcons name="history" size={40} color={t.borderLight} />
-            <Text style={[styles.emptyHistoryTitle, { color: t.text }]}>No saved summaries yet</Text>
-            <Text style={[styles.emptyHistoryMsg, { color: t.textSecondary }]}>
-              Generate a visit summary to save it here automatically.
+            <MaterialCommunityIcons name="history" size={40} color={theme.borderLight} />
+            <Text style={[styles.emptyHistoryTitle, { color: theme.text }]}>{t('visitPrep.emptyHistoryTitle')}</Text>
+            <Text style={[styles.emptyHistoryMsg, { color: theme.textSecondary }]}>
+              {t('visitPrep.emptyHistoryMsg')}
             </Text>
-            <TouchableOpacity style={[styles.generateBtn, { backgroundColor: t.accent, marginTop: 16 }]} onPress={() => goTab('summary')}>
-              <Text style={styles.generateBtnText}>Go to Summary</Text>
+            <TouchableOpacity style={[styles.generateBtn, { backgroundColor: theme.accent, marginTop: 16 }]} onPress={() => goTab('summary')}>
+              <Text style={styles.generateBtnText}>{t('visitPrep.goToSummary')}</Text>
             </TouchableOpacity>
           </View>
         )
@@ -467,44 +527,44 @@ export function VisitPrepScreen() {
       renderItem={({ item }) => {
         const customName = item.display_name?.trim();
         return (
-          <View style={[styles.historyCard, { backgroundColor: t.surface, borderColor: t.borderLight }]}>
+          <View style={[styles.historyCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
             <View style={styles.historyCardHeader}>
               <View style={{ flex: 1, gap: 4 }}>
                 {customName ? (
-                  <Text style={[styles.historyCardName, { color: t.text }]} numberOfLines={2}>
+                  <Text style={[styles.historyCardName, { color: theme.text }]} numberOfLines={2}>
                     {customName}
                   </Text>
                 ) : null}
                 <Text
                   style={[
                     customName ? styles.historyCardDateSub : styles.historyCardDate,
-                    { color: customName ? t.textSecondary : t.accent },
+                    { color: customName ? theme.textSecondary : theme.accent },
                   ]}
                   numberOfLines={2}
                 >
-                  {formatGeneratedLabel(item.generated_at)}
+                  {formatGeneratedLabel(item.generated_at, localeTag)}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={() => setSummaryMenuItem(item)}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 style={styles.historyCardMenuBtn}
-                accessibilityLabel="Summary options"
+                accessibilityLabel={t('visitPrep.a11ySummaryOptions')}
                 accessibilityRole="button"
               >
-                <MaterialCommunityIcons name="dots-vertical" size={22} color={t.textSecondary} />
+                <MaterialCommunityIcons name="dots-vertical" size={22} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <Pressable
               onPress={() => openHistoryDetail(item)}
               style={({ pressed }) => [pressed && { opacity: 0.85 }]}
               accessibilityRole="button"
-              accessibilityLabel="Open summary"
+              accessibilityLabel={t('visitPrep.a11yOpenSummary')}
             >
-              <Text style={[styles.historyCardPreview, { color: t.textSecondary }]} numberOfLines={3}>
+              <Text style={[styles.historyCardPreview, { color: theme.textSecondary }]} numberOfLines={3}>
                 {historyPreview(item.content)}
               </Text>
-              <Text style={[styles.historyCardHint, { color: t.textTertiary }]}>Tap to read full summary</Text>
+              <Text style={[styles.historyCardHint, { color: theme.textTertiary }]}>{t('visitPrep.tapToReadFull')}</Text>
             </Pressable>
           </View>
         );
@@ -513,12 +573,12 @@ export function VisitPrepScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: t.bg }]}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       {/* Clear native-stack transparent header so Summary / History tabs are not covered by glass chrome */}
       <View style={[styles.tabRowWrap, { paddingHorizontal: 20, paddingTop: headerHeight + spacing.md }]}>
         <View style={styles.tabRow}>
-          <TabPill tab="summary" label="Summary" />
-          <TabPill tab="history" label="History" />
+          <TabPill tab="summary" label={t('visitPrep.tabs.summary')} />
+          <TabPill tab="history" label={t('visitPrep.tabs.history')} />
         </View>
       </View>
 
@@ -552,7 +612,7 @@ export function VisitPrepScreen() {
               <Animated.View
                 style={[
                   StyleSheet.absoluteFillObject,
-                  { backgroundColor: t.bg, transform: [{ translateX: detailTranslateX }] },
+                  { backgroundColor: theme.bg, transform: [{ translateX: detailTranslateX }] },
                 ]}
               >
                 <ScrollView
@@ -561,27 +621,28 @@ export function VisitPrepScreen() {
                   contentContainerStyle={[styles.content, { paddingTop: spacing.sm }]}
                 >
                   <TouchableOpacity style={styles.backRow} onPress={closeHistoryDetail} accessibilityRole="button">
-                    <MaterialCommunityIcons name="chevron-left" size={22} color={t.accent} />
-                    <Text style={[styles.backText, { color: t.accent }]}>All summaries</Text>
+                    <MaterialCommunityIcons name="chevron-left" size={22} color={theme.accent} />
+                    <Text style={[styles.backText, { color: theme.accent }]}>{t('visitPrep.allSummaries')}</Text>
                   </TouchableOpacity>
-                  <View style={[styles.summaryBox, { backgroundColor: t.surface }]}>
+                  <View style={[styles.summaryBox, { backgroundColor: theme.surface }]}>
                     <View style={styles.summaryHeader}>
                       <View style={{ flex: 1, marginRight: 8, gap: 4 }}>
                         {historyDetail.display_name?.trim() ? (
-                          <Text style={[styles.detailDisplayName, { color: t.text }]} numberOfLines={3}>
+                          <Text style={[styles.detailDisplayName, { color: theme.text }]} numberOfLines={3}>
                             {historyDetail.display_name.trim()}
                           </Text>
                         ) : null}
-                        <Text style={[styles.summaryDate, { color: t.textTertiary, flex: 0 }]}>
-                          Generated {formatGeneratedLabel(historyDetail.generated_at)}
+                        <Text style={[styles.summaryDate, { color: theme.textTertiary, flex: 0 }]}>
+                          {t('visitPrep.generatedPrefix', { date: formatGeneratedLabel(historyDetail.generated_at, localeTag) })}
                         </Text>
                       </View>
                       <TouchableOpacity onPress={() => handleCopy(historyDetail.content)} style={styles.actionBtn}>
-                        <MaterialCommunityIcons name="content-copy" size={14} color={t.accent} />
-                        <Text style={[styles.refreshText, { color: t.accent }]}>Copy</Text>
+                        <MaterialCommunityIcons name="content-copy" size={14} color={theme.accent} />
+                        <Text style={[styles.refreshText, { color: theme.accent }]}>{t('visitPrep.copy')}</Text>
                       </TouchableOpacity>
                     </View>
-                    {renderMarkdown(historyDetail.content, t)}
+                    <AiHealthDisclaimer kind="visit_prep" />
+                    {renderMinimalMarkdown(historyDetail.content, theme, historyDetail.id, 'visitPrep')}
                   </View>
                 </ScrollView>
               </Animated.View>
@@ -599,10 +660,10 @@ export function VisitPrepScreen() {
         <View style={styles.menuRoot}>
           <Pressable style={styles.menuBackdropFill} onPress={closeSummaryMenu} />
           <View style={styles.menuCenterWrap} pointerEvents="box-none">
-            <View style={[styles.menuSheet, { backgroundColor: t.surface, borderColor: t.borderLight }]}>
+            <View style={[styles.menuSheet, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
               {summaryMenuItem ? (
                 <>
-                  <Text style={[styles.menuTitle, { color: t.textTertiary }]}>Summary</Text>
+                  <Text style={[styles.menuTitle, { color: theme.textTertiary }]}>{t('visitPrep.menuTitle')}</Text>
                   <TouchableOpacity
                     style={styles.menuRow}
                     onPress={() => {
@@ -611,9 +672,9 @@ export function VisitPrepScreen() {
                       openHistoryDetail(row);
                     }}
                   >
-                    <Text style={[styles.menuRowLabel, { color: t.text }]}>Read</Text>
+                    <Text style={[styles.menuRowLabel, { color: theme.text }]}>{t('visitPrep.read')}</Text>
                   </TouchableOpacity>
-                  <View style={[styles.menuDivider, { backgroundColor: t.border }]} />
+                  <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
                   {canEditVisitPrepSummary(summaryMenuItem, user?.id, isFamilyAdmin) ? (
                     <>
                       <TouchableOpacity
@@ -625,9 +686,9 @@ export function VisitPrepScreen() {
                           setRenameTarget(row);
                         }}
                       >
-                        <Text style={[styles.menuRowLabel, { color: t.text }]}>Rename</Text>
+                        <Text style={[styles.menuRowLabel, { color: theme.text }]}>{t('visitPrep.rename')}</Text>
                       </TouchableOpacity>
-                      <View style={[styles.menuDivider, { backgroundColor: t.border }]} />
+                      <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
                     </>
                   ) : null}
                   <TouchableOpacity
@@ -638,9 +699,9 @@ export function VisitPrepScreen() {
                       await handleCopy(row.content);
                     }}
                   >
-                    <Text style={[styles.menuRowLabel, { color: t.text }]}>Copy</Text>
+                    <Text style={[styles.menuRowLabel, { color: theme.text }]}>{t('visitPrep.copy')}</Text>
                   </TouchableOpacity>
-                  <View style={[styles.menuDivider, { backgroundColor: t.border }]} />
+                  <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
                   <TouchableOpacity
                     style={styles.menuRow}
                     onPress={() => {
@@ -649,9 +710,9 @@ export function VisitPrepScreen() {
                       scheduleExportAfterMenuDismiss(row.content);
                     }}
                   >
-                    <Text style={[styles.menuRowLabel, { color: t.text }]}>Export</Text>
+                    <Text style={[styles.menuRowLabel, { color: theme.text }]}>{t('visitPrep.exportAction')}</Text>
                   </TouchableOpacity>
-                  <View style={[styles.menuDivider, { backgroundColor: t.border }]} />
+                  <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
                   <TouchableOpacity
                     style={styles.menuRow}
                     onPress={() => {
@@ -659,15 +720,15 @@ export function VisitPrepScreen() {
                       closeSummaryMenu();
                       if (!canEditVisitPrepSummary(row, user?.id, isFamilyAdmin)) {
                         Alert.alert(
-                          'Cannot delete',
-                          'Only the person who generated this summary or a family admin can delete it.'
+                          t('visitPrep.cannotDeleteTitle'),
+                          t('visitPrep.cannotDeleteMessage')
                         );
                         return;
                       }
                       confirmDeleteSummary(row);
                     }}
                   >
-                    <Text style={[styles.menuRowLabel, { color: t.error }]}>Delete</Text>
+                    <Text style={[styles.menuRowLabel, { color: theme.error }]}>{t('visitPrep.delete')}</Text>
                   </TouchableOpacity>
                 </>
               ) : null}
@@ -698,45 +759,45 @@ export function VisitPrepScreen() {
               }}
             />
             <View style={styles.renameCenterWrap} pointerEvents="box-none">
-            <View style={[styles.renameSheet, { backgroundColor: t.surface, borderColor: t.borderLight }]}>
-              <Text style={[styles.renameTitle, { color: t.text }]}>Rename summary</Text>
-              <Text style={[styles.renameHint, { color: t.textSecondary }]}>
-                Optional. The generated date and time below always stay the same.
+            <View style={[styles.renameSheet, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+              <Text style={[styles.renameTitle, { color: theme.text }]}>{t('visitPrep.renameModalTitle')}</Text>
+              <Text style={[styles.renameHint, { color: theme.textSecondary }]}>
+                {t('visitPrep.renameModalHint')}
               </Text>
               <TextInput
                 value={renameDraft}
                 onChangeText={setRenameDraft}
-                placeholder="e.g. Dr. Chen — follow-up"
-                placeholderTextColor={t.textTertiary}
+                placeholder={t('visitPrep.renamePlaceholder')}
+                placeholderTextColor={theme.textTertiary}
                 maxLength={120}
-                style={[styles.renameInput, { color: t.text, borderColor: t.borderLight, backgroundColor: t.bg }]}
+                style={[styles.renameInput, { color: theme.text, borderColor: theme.borderLight, backgroundColor: theme.bg }]}
                 autoFocus
                 autoCorrect
                 returnKeyType="done"
                 onSubmitEditing={saveRename}
               />
-              <Text style={[styles.renameMeta, { color: t.textTertiary }]}>
-                {renameTarget ? formatGeneratedLabel(renameTarget.generated_at) : ''}
+              <Text style={[styles.renameMeta, { color: theme.textTertiary }]}>
+                {renameTarget ? formatGeneratedLabel(renameTarget.generated_at, localeTag) : ''}
               </Text>
               <View style={styles.renameActions}>
                 <TouchableOpacity
-                  style={[styles.renameBtnSecondary, { borderColor: t.borderLight }]}
+                  style={[styles.renameBtnSecondary, { borderColor: theme.borderLight }]}
                   onPress={() => {
                     setRenameTarget(null);
                     setRenameDraft('');
                   }}
                 >
-                  <Text style={[styles.renameBtnSecondaryText, { color: t.textSecondary }]}>Cancel</Text>
+                  <Text style={[styles.renameBtnSecondaryText, { color: theme.textSecondary }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.renameBtnPrimary, { backgroundColor: t.accent }]}
+                  style={[styles.renameBtnPrimary, { backgroundColor: theme.accent }]}
                   onPress={saveRename}
                   disabled={updateDisplayName.isPending}
                 >
                   {updateDisplayName.isPending ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.renameBtnPrimaryText}>Save</Text>
+                    <Text style={styles.renameBtnPrimaryText}>{t('common.save')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -814,10 +875,6 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   summaryDate: { fontSize: 12, flex: 1, marginRight: 8 },
   refreshText: { fontSize: 14, fontWeight: '600' },
-  heading: { fontSize: 16, fontWeight: '700', marginTop: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginTop: 12 },
-  bullet: { fontSize: 14, lineHeight: 22 },
-  body: { fontSize: 14, lineHeight: 22 },
   historyListContent: { padding: 20, gap: 12, paddingBottom: 32 },
   historyListEmpty: { flexGrow: 1, justifyContent: 'center' },
   historyLoadingOnly: { alignItems: 'center', paddingVertical: 48, gap: 12 },

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '../../lib/haptics';
 import { useFamilyStore } from '../../store/family';
 import { useAuthStore } from '../../store/auth';
@@ -8,8 +9,11 @@ import { useCalendarEvents } from '../calendar/hooks/useCalendarEvents';
 import { useCheckIns, useAddCheckIn } from '../checkins/hooks/useCheckIns';
 import {
   useMedications, useTodayMedLogs,
-  parseMedicationSchedule, computeDoseStatus, useLogDose,
-  scheduledDoseSlotsToday, takenDoseSlotsToday,
+  parseMedicationSchedule,
+  computeDoseStatusForDate,
+  useLogDose,
+  scheduledDoseSlotsForDate,
+  takenDoseSlotsForDate,
 } from '../medications/hooks/useMedications';
 import { useFamilyDoctors } from '../doctors/hooks/useFamilyDoctors';
 import { useTheme, type Theme, space, typography } from '../../theme';
@@ -19,31 +23,25 @@ import { Collapsible, DisclosureChevron } from '../../components/Collapsible';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { CheckInMood, Medication, Task } from '../../types';
 import { MOODS, moodMeta } from '../checkins/moods';
-const MOOD_AUTO_SUMMARY: Record<CheckInMood, string> = {
-  great: 'Doing great today!',
-  good: 'Having a good day',
-  okay: 'Getting through the day',
-  concerning: 'Having some concerns today',
-  emergency: 'Needs immediate attention',
-};
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, tx: (key: string, options?: Record<string, unknown>) => string) {
   const diff = Date.now() - new Date(iso).getTime();
   const hours = Math.floor(diff / 3_600_000);
-  if (hours < 1) return 'just now';
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 1) return tx('home.dashboardSummary.timeAgo.justNow');
+  if (hours < 24) return tx('home.dashboardSummary.timeAgo.hoursAgo', { count: hours });
+  return tx('home.dashboardSummary.timeAgo.daysAgo', { count: Math.floor(hours / 24) });
 }
 
-function formatGlanceEventDateTime(iso: string) {
+function formatGlanceEventDateTime(iso: string, localeTag: string) {
   const d = new Date(iso);
-  const datePart = d.toLocaleDateString('en-US', {
+  const datePart = d.toLocaleDateString(localeTag, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-  const timePart = d.toLocaleTimeString('en-US', {
+  const timePart = d.toLocaleTimeString(localeTag, {
     hour: 'numeric',
     minute: '2-digit',
   });
@@ -67,6 +65,8 @@ interface Props {
 export function DashboardSummary({ onNavigate }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const localeTag = useFormatLocaleTag();
   const { user } = useAuthStore();
   const family = useFamilyStore((s) => s.family);
   const [medsLogExpanded, setMedsLogExpanded] = useState(true);
@@ -117,18 +117,26 @@ export function DashboardSummary({ onNavigate }: Props) {
     (m) => parseMedicationSchedule(m).periodType !== 'as_needed'
   );
   const pendingMeds = trackedMeds.filter(
-    (m) => computeDoseStatus(m, todayLogs[m.id]) !== 'taken'
+    (m) => computeDoseStatusForDate(m, todayLogs[m.id], todayStart) !== 'taken'
   );
   const medDosesDone = trackedMeds.reduce(
-    (sum, m) => sum + takenDoseSlotsToday(m, todayLogs[m.id], todayStart),
+    (sum, m) => sum + takenDoseSlotsForDate(m, todayLogs[m.id], todayStart),
     0
   );
-  const medDosesTotal = trackedMeds.reduce((sum, m) => sum + scheduledDoseSlotsToday(m), 0);
+  const medDosesTotal = trackedMeds.reduce((sum, m) => sum + scheduledDoseSlotsForDate(m, todayStart), 0);
   const medDosesRemaining = Math.max(0, medDosesTotal - medDosesDone);
   const medDosesComplete = medDosesTotal > 0 && medDosesDone >= medDosesTotal;
   const firstPendingMed = pendingMeds[0];
 
   const completedTasksCount = allTasks.filter((task) => task.completed).length;
+
+  const moodAutoSummary: Record<CheckInMood, string> = {
+    great: tx('home.dashboardSummary.checkIn.moodSummary.great'),
+    good: tx('home.dashboardSummary.checkIn.moodSummary.good'),
+    okay: tx('home.dashboardSummary.checkIn.moodSummary.okay'),
+    concerning: tx('home.dashboardSummary.checkIn.moodSummary.concerning'),
+    emergency: tx('home.dashboardSummary.checkIn.moodSummary.emergency'),
+  };
 
   function handleQuickLog(medId: string) {
     if (!user) return;
@@ -152,7 +160,7 @@ export function DashboardSummary({ onNavigate }: Props) {
 
   function handleQuickCheckIn(mood: CheckInMood) {
     if (!user) return;
-    addCheckIn.mutate({ mood, summary: MOOD_AUTO_SUMMARY[mood], submitted_by: user.id });
+    addCheckIn.mutate({ mood, summary: moodAutoSummary[mood], submitted_by: user.id });
   }
 
   const showProgress =
@@ -167,13 +175,13 @@ export function DashboardSummary({ onNavigate }: Props) {
       {/* ── Today at a glance ─── */}
       {showProgress && (
         <View style={styles.progressCard}>
-          <Text style={styles.progressTitle}>Today at a Glance</Text>
+          <Text style={styles.progressTitle}>{tx('home.dashboardSummary.todayAtAGlance.title')}</Text>
           {trackedMeds.length > 0 && (
             <View style={styles.progressItem}>
               <View style={styles.progressLabelRow}>
                 <View style={styles.progressLabelInner}>
                   <Icon name="medications" size={15} color={t.text} />
-                  <Text style={styles.progressLabel}>Medications</Text>
+                  <Text style={styles.progressLabel}>{tx('home.nav.medications.label')}</Text>
                 </View>
                 <Text style={[styles.progressCount, medDosesComplete && styles.progressCountDone]}>
                   {medDosesDone}/{medDosesTotal}
@@ -190,7 +198,7 @@ export function DashboardSummary({ onNavigate }: Props) {
               <View style={styles.progressLabelRow}>
                 <View style={styles.progressLabelInner}>
                   <Icon name="tasks" size={15} color={t.text} />
-                  <Text style={styles.progressLabel}>Tasks</Text>
+                  <Text style={styles.progressLabel}>{tx('home.nav.tasks.label')}</Text>
                 </View>
                 <Text style={[styles.progressCount, completedTasksCount === allTasks.length && styles.progressCountDone]}>
                   {completedTasksCount}/{allTasks.length}
@@ -212,7 +220,7 @@ export function DashboardSummary({ onNavigate }: Props) {
               <View style={styles.progressLabelRow}>
                 <View style={styles.progressLabelInner}>
                   <Icon name="calendar" size={15} color={t.text} />
-                  <Text style={styles.progressLabel}>Calendar</Text>
+                  <Text style={styles.progressLabel}>{tx('home.nav.calendar.label')}</Text>
                 </View>
               </View>
               <View style={styles.glanceEventsList}>
@@ -227,7 +235,7 @@ export function DashboardSummary({ onNavigate }: Props) {
                       {ev.title}
                     </Text>
                     <Text style={styles.glanceEventMeta}>
-                      {formatGlanceEventDateTime(ev.starts_at)}
+                      {formatGlanceEventDateTime(ev.starts_at, localeTag)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -241,7 +249,7 @@ export function DashboardSummary({ onNavigate }: Props) {
       {!checkinToday && (
         <View style={styles.checkinPrompt}>
           <Text style={styles.checkinQuestion}>
-            How is {family?.care_recipient_name} doing today?
+            {tx('home.dashboardSummary.checkIn.question', { name: family?.care_recipient_name ?? '' })}
           </Text>
           <View style={styles.moodBtnRow}>
             {MOODS.map(({ key: mood, mci, color }) => (
@@ -276,21 +284,21 @@ export function DashboardSummary({ onNavigate }: Props) {
           >
             <View style={styles.cardIcon}><Icon name="medications" size={20} color={t.accent} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>Medications Today</Text>
+              <Text style={styles.cardTitle}>{tx('home.dashboardSummary.medicationsToday.title')}</Text>
               {trackedMeds.length === 0 ? (
-                <Text style={styles.cardSub}>No medications tracked</Text>
+                <Text style={styles.cardSub}>{tx('home.dashboardSummary.medicationsToday.noneTracked')}</Text>
               ) : medDosesComplete ? (
-                <Text style={[styles.cardSub, styles.green]}>All doses logged</Text>
+                <Text style={[styles.cardSub, styles.green]}>{tx('home.dashboardSummary.medicationsToday.allDosesLogged')}</Text>
               ) : (
                 <>
                   <Text style={[styles.cardSub, styles.amber]}>
-                    {medDosesRemaining} of {medDosesTotal} dose{medDosesTotal === 1 ? '' : 's'} remaining
+                    {tx('home.dashboardSummary.medicationsToday.dosesRemaining', { remaining: medDosesRemaining, total: medDosesTotal })}
                   </Text>
                   {pendingMeds.length === 1 && firstPendingMed ? (
                     <Text style={styles.cardMeta} numberOfLines={1}>{firstPendingMed.name}</Text>
                   ) : null}
                   {pendingMeds.length > 1 ? (
-                    <Text style={styles.cardMeta}>Choose a medication below to log a dose</Text>
+                    <Text style={styles.cardMeta}>{tx('home.dashboardSummary.medicationsToday.chooseBelow')}</Text>
                   ) : null}
                 </>
               )}
@@ -309,7 +317,7 @@ export function DashboardSummary({ onNavigate }: Props) {
             >
               {logDose.isPending
                 ? <ActivityIndicator size="small" color={t.surface} />
-                : <Text style={styles.quickLogText}>Log</Text>
+                : <Text style={styles.quickLogText}>{tx('home.dashboardSummary.common.log')}</Text>
               }
             </TouchableOpacity>
           ) : null}
@@ -325,7 +333,9 @@ export function DashboardSummary({ onNavigate }: Props) {
               activeOpacity={0.65}
             >
               <Text style={styles.expandToggleText}>
-                {medsLogExpanded ? 'Hide medications' : `Show ${pendingMeds.length} medications to log`}
+                {medsLogExpanded
+                  ? tx('home.dashboardSummary.medicationsToday.hideMedications')
+                  : tx('home.dashboardSummary.medicationsToday.showMedicationsToLog', { count: pendingMeds.length })}
               </Text>
               <DisclosureChevron expanded={medsLogExpanded} color={t.textTertiary} size={18} />
             </TouchableOpacity>
@@ -355,7 +365,7 @@ export function DashboardSummary({ onNavigate }: Props) {
                       >
                         {loggingThis
                           ? <ActivityIndicator size="small" color={t.surface} />
-                          : <Text style={styles.quickLogText}>Log</Text>
+                          : <Text style={styles.quickLogText}>{tx('home.dashboardSummary.common.log')}</Text>
                         }
                       </TouchableOpacity>
                     </View>
@@ -372,18 +382,18 @@ export function DashboardSummary({ onNavigate }: Props) {
         <TouchableOpacity style={styles.cardTapArea} onPress={() => onNavigate('tasks')} activeOpacity={0.7}>
           <View style={styles.cardIcon}><Icon name="tasks" size={20} color={t.accent} /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Tasks</Text>
+            <Text style={styles.cardTitle}>{tx('home.nav.tasks.label')}</Text>
             {pendingTasks.length === 0 ? (
-              <Text style={[styles.cardSub, styles.green]}>All caught up</Text>
+              <Text style={[styles.cardSub, styles.green]}>{tx('home.dashboardSummary.tasks.allCaughtUp')}</Text>
             ) : overdueTasks.length > 0 ? (
               <Text style={[styles.cardSub, styles.red]}>
-                {overdueTasks.length} overdue · {pendingTasks.length} open
+                {tx('home.dashboardSummary.tasks.overdueAndOpen', { overdue: overdueTasks.length, open: pendingTasks.length })}
               </Text>
             ) : (
-              <Text style={styles.cardSub}>{pendingTasks.length} open</Text>
+              <Text style={styles.cardSub}>{tx('home.dashboardSummary.tasks.open', { count: pendingTasks.length })}</Text>
             )}
             {pendingTasks.length > 1 ? (
-              <Text style={styles.cardMeta}>Choose a task below to mark complete</Text>
+              <Text style={styles.cardMeta}>{tx('home.dashboardSummary.tasks.chooseBelow')}</Text>
             ) : null}
           </View>
           <Icon name="chevron" size={18} color={t.borderLight} />
@@ -409,7 +419,7 @@ export function DashboardSummary({ onNavigate }: Props) {
               </TouchableOpacity>
               <Text style={styles.taskLabel} numberOfLines={1}>{pendingTasks[0].title}</Text>
               {pendingTasks[0].due_date && new Date(pendingTasks[0].due_date) < now && (
-                <View style={styles.overduePill}><Text style={styles.overdueText}>Overdue</Text></View>
+                <View style={styles.overduePill}><Text style={styles.overdueText}>{tx('home.dashboardSummary.tasks.overduePill')}</Text></View>
               )}
             </View>
           </View>
@@ -425,7 +435,9 @@ export function DashboardSummary({ onNavigate }: Props) {
               activeOpacity={0.65}
             >
               <Text style={styles.expandToggleText}>
-                {tasksCheckExpanded ? 'Hide tasks' : `Show ${pendingTasks.length} tasks to complete`}
+                {tasksCheckExpanded
+                  ? tx('home.dashboardSummary.tasks.hideTasks')
+                  : tx('home.dashboardSummary.tasks.showTasksToComplete', { count: pendingTasks.length })}
               </Text>
               <DisclosureChevron expanded={tasksCheckExpanded} color={t.textTertiary} size={18} />
             </TouchableOpacity>
@@ -456,13 +468,15 @@ export function DashboardSummary({ onNavigate }: Props) {
                           <View style={styles.homeTaskDueRow}>
                             {isOverdue ? <Icon name="warning" size={12} color={t.error} /> : null}
                             <Text style={[styles.homeSubMeta, isOverdue && styles.homeSubMetaOverdue]}>
-                              Due {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {tx('home.dashboardSummary.tasks.dueOn', {
+                                date: new Date(task.due_date).toLocaleDateString(localeTag, { month: 'short', day: 'numeric' }),
+                              })}
                             </Text>
                           </View>
                         ) : null}
                       </View>
                       {isOverdue ? (
-                        <View style={styles.overduePill}><Text style={styles.overdueText}>Overdue</Text></View>
+                        <View style={styles.overduePill}><Text style={styles.overdueText}>{tx('home.dashboardSummary.tasks.overduePill')}</Text></View>
                       ) : null}
                     </View>
                   </View>
@@ -477,16 +491,16 @@ export function DashboardSummary({ onNavigate }: Props) {
       <TouchableOpacity style={[styles.card, styles.cardRow]} onPress={() => onNavigate('calendar')} activeOpacity={0.7}>
         <View style={styles.cardIcon}><Icon name="calendar" size={20} color={t.accent} /></View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Next Event</Text>
+          <Text style={styles.cardTitle}>{tx('home.dashboardSummary.nextEvent.title')}</Text>
           {nextEvent ? (
             <>
               <Text style={styles.cardSub} numberOfLines={1}>{nextEvent.title}</Text>
               <Text style={styles.cardMeta}>
-                {new Date(nextEvent.starts_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                {new Date(nextEvent.starts_at).toLocaleDateString(localeTag, { weekday: 'short', month: 'short', day: 'numeric' })}
               </Text>
             </>
           ) : (
-            <Text style={styles.cardSub}>No upcoming events</Text>
+            <Text style={styles.cardSub}>{tx('home.dashboardSummary.nextEvent.none')}</Text>
           )}
         </View>
         <Icon name="chevron" size={18} color={t.borderLight} />
@@ -496,27 +510,29 @@ export function DashboardSummary({ onNavigate }: Props) {
       <TouchableOpacity style={[styles.card, styles.cardRow]} onPress={() => onNavigate('doctors')} activeOpacity={0.7}>
         <View style={styles.cardIcon}><Icon name="doctor" size={20} color={t.accent} /></View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Doctors</Text>
+          <Text style={styles.cardTitle}>{tx('home.nav.doctors.label')}</Text>
           {(doctors?.length ?? 0) === 0 ? (
-            <Text style={styles.cardSub}>Add contacts, specialty, and linked meds</Text>
+            <Text style={styles.cardSub}>{tx('home.dashboardSummary.doctors.emptyPrompt')}</Text>
           ) : nextDoctorAppt?.next_appointment_at ? (
             <>
               <Text style={styles.cardSub} numberOfLines={1}>
                 {nextDoctorAppt.name}
               </Text>
               <Text style={styles.cardMeta}>
-                Next visit ·{' '}
+                {tx('home.dashboardSummary.doctors.nextVisitPrefix')}{' '}
                 {(() => {
                   const d = new Date(nextDoctorAppt.next_appointment_at!);
-                  const datePart = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                  const datePart = d.toLocaleDateString(localeTag, { weekday: 'short', month: 'short', day: 'numeric' });
+                  // Match DoctorsScreen / Calendar: local 00:00 = date-only visit (no time).
+                  if (d.getHours() === 0 && d.getMinutes() === 0) return datePart;
+                  const timePart = d.toLocaleTimeString(localeTag, { hour: 'numeric', minute: '2-digit' });
                   return `${datePart} · ${timePart}`;
                 })()}
               </Text>
             </>
           ) : (
             <Text style={styles.cardSub}>
-              {(doctors?.length ?? 0)} on file — tap to add next visit
+              {tx('home.dashboardSummary.doctors.onFileTapToAddNextVisit', { count: doctors?.length ?? 0 })}
             </Text>
           )}
         </View>
@@ -528,7 +544,7 @@ export function DashboardSummary({ onNavigate }: Props) {
         <TouchableOpacity style={[styles.card, styles.cardRow]} onPress={() => onNavigate('checkins')} activeOpacity={0.7}>
           <View style={styles.cardIcon}><Icon name="checkin" size={20} color={t.accent} /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Today's Check-In</Text>
+            <Text style={styles.cardTitle}>{tx('home.dashboardSummary.todaysCheckIn.title')}</Text>
             <View style={styles.moodStatusRow}>
               <MaterialCommunityIcons
                 name={moodMeta(checkinToday.mood).mci as never}
@@ -538,7 +554,7 @@ export function DashboardSummary({ onNavigate }: Props) {
               <Text style={[styles.moodStatusLabel, { color: moodMeta(checkinToday.mood).color }]}>
                 {checkinToday.mood.charAt(0).toUpperCase() + checkinToday.mood.slice(1)}
               </Text>
-              <Text style={styles.cardMeta}> · {timeAgo(checkinToday.created_at)}</Text>
+              <Text style={styles.cardMeta}> · {timeAgo(checkinToday.created_at, tx)}</Text>
             </View>
             <Text style={styles.cardSub} numberOfLines={1}>{checkinToday.summary}</Text>
           </View>

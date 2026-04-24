@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../theme';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { TaskBoardScreen } from '../features/tasks/TaskBoardScreen';
@@ -19,6 +20,7 @@ import { AppearanceScreen } from '../features/settings/AppearanceScreen';
 import { LanguageScreen } from '../features/settings/LanguageScreen';
 import { DataPrivacyScreen } from '../features/settings/DataPrivacyScreen';
 import { NotesScreen } from '../features/notes/NotesScreen';
+import { SubscriptionScreen } from '../subscription/SubscriptionScreen';
 import { MedicationDetailRoute } from './MedicationDetailRoute';
 import { useReduceMotion } from './useReduceMotion';
 import type { MainStackParamList } from './types';
@@ -34,6 +36,7 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 export function MainStack() {
   const reduceMotion = useReduceMotion();
   const t = useTheme();
+  const { t: tx } = useTranslation();
   const push = nativePushHeaderScreenOptions(t);
 
   return (
@@ -49,30 +52,103 @@ export function MainStack() {
       <Stack.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: 'Kin', headerShown: false }}
+        options={{ title: tx('auth.brand.name'), headerShown: false }}
       />
-      <Stack.Screen name="Tasks" component={TaskBoardScreen} options={{ ...push, title: 'Tasks' }} />
-      <Stack.Screen name="Calendar" component={CalendarScreen} options={{ ...push, title: 'Calendar' }} />
-      <Stack.Screen name="VisitPrep" component={VisitPrepScreen} options={{ ...push, title: 'Visit Prep' }} />
-      <Stack.Screen name="Doctors" component={DoctorsScreen} options={{ ...push, title: 'Doctors' }} />
-      <Stack.Screen name="Medications" component={MedicationListScreen} options={{ ...push, title: 'Medications' }} />
+      <Stack.Screen
+        name="Tasks"
+        component={TaskBoardScreen}
+        options={() => ({ ...push, title: tx('home.nav.tasks.label') })}
+      />
+      <Stack.Screen
+        name="Calendar"
+        component={CalendarScreen}
+        options={() => ({ ...push, title: tx('home.nav.calendar.label') })}
+      />
+      <Stack.Screen
+        name="VisitPrep"
+        component={VisitPrepScreen}
+        options={() => ({ ...push, title: tx('visitPrep.screenTitle') })}
+      />
+      <Stack.Screen
+        name="Doctors"
+        component={DoctorsScreen}
+        options={() => ({ ...push, title: tx('home.nav.doctors.label') })}
+      />
+      <Stack.Screen
+        name="Medications"
+        component={MedicationListScreen}
+        options={() => ({ ...push, title: tx('home.nav.medications.label') })}
+      />
       <Stack.Screen
         name="MedicationDetail"
         component={MedicationDetailRoute}
-        options={{ ...push, title: 'Medication' }}
+        options={() => ({ ...push, title: tx('medications.detail.screenTitle') })}
       />
-      <Stack.Screen name="Health" component={HealthLogScreen} options={{ ...push, title: 'Health Log' }} />
-      <Stack.Screen name="Documents" component={DocumentsScreen} options={{ ...push, title: 'Documents' }} />
-      <Stack.Screen name="CheckIns" component={CheckInScreen} options={{ ...push, title: 'Check-Ins' }} />
-      <Stack.Screen name="Members" component={MemberListScreen} options={{ ...push, title: 'Members' }} />
-      <Stack.Screen name="InviteMember" component={InviteMemberScreen} options={{ ...push, title: 'Invite a member' }} />
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ ...push, title: 'Settings' }} />
-      <Stack.Screen name="Accessibility" component={AccessibilityScreen} options={{ ...push, title: 'Accessibility' }} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ ...push, title: 'Notifications' }} />
-      <Stack.Screen name="Appearance" component={AppearanceScreen} options={{ ...push, title: 'Appearance' }} />
-      <Stack.Screen name="Language" component={LanguageScreen} options={{ ...push, title: 'Language' }} />
-      <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} options={{ ...push, title: 'Data & Privacy' }} />
-      <Stack.Screen name="Notes" component={NotesScreen} options={{ ...push, title: 'Notes' }} />
+      <Stack.Screen
+        name="Health"
+        component={HealthLogScreen}
+        options={() => ({ ...push, title: tx('home.nav.health.label') })}
+      />
+      <Stack.Screen
+        name="Documents"
+        component={DocumentsScreen}
+        options={() => ({ ...push, title: tx('home.nav.documents.label') })}
+      />
+      <Stack.Screen
+        name="CheckIns"
+        component={CheckInScreen}
+        options={() => ({ ...push, title: tx('home.nav.checkins.label') })}
+      />
+      <Stack.Screen
+        name="Members"
+        component={MemberListScreen}
+        options={() => ({ ...push, title: tx('home.nav.members.label') })}
+      />
+      <Stack.Screen
+        name="InviteMember"
+        component={InviteMemberScreen}
+        options={() => ({ ...push, title: tx('family.inviteMember.screenTitle') })}
+      />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={() => ({ ...push, title: tx('settings.screenTitle') })}
+      />
+      <Stack.Screen
+        name="Accessibility"
+        component={AccessibilityScreen}
+        options={() => ({ ...push, title: tx('settings.preferences.accessibility') })}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={() => ({ ...push, title: tx('settings.preferences.notifications') })}
+      />
+      <Stack.Screen
+        name="Appearance"
+        component={AppearanceScreen}
+        options={() => ({ ...push, title: tx('settings.preferences.appearance') })}
+      />
+      <Stack.Screen
+        name="Language"
+        component={LanguageScreen}
+        options={() => ({ ...push, title: tx('language.screenTitle') })}
+      />
+      <Stack.Screen
+        name="DataPrivacy"
+        component={DataPrivacyScreen}
+        options={() => ({ ...push, title: tx('settings.privacy.dataPrivacy') })}
+      />
+      <Stack.Screen
+        name="Notes"
+        component={NotesScreen}
+        options={() => ({ ...push, title: tx('home.nav.notes.label') })}
+      />
+      <Stack.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={() => ({ ...push, title: tx('subscription.screenTitle') })}
+      />
     </Stack.Navigator>
   );
 }

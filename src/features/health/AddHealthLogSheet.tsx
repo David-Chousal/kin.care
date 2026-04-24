@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Alert,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { FormSheet } from '../../components/FormSheet';
@@ -14,7 +15,7 @@ import { useAuthStore } from '../../store/auth';
 import {
   useAddHealthLog,
   useUpdateHealthLog,
-  healthLogPhotoPublicUrl,
+  useHealthLogPhotoUrl,
   type HealthLogPhotoPatch,
 } from './hooks/useHealthLogs';
 import { useTheme, type Theme } from '../../theme';
@@ -26,6 +27,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   editing?: HealthLog;
+  /** Increment when opening the sheet to add/change a photo from the log list; triggers the image picker once. */
+  photoPickerNonce?: number;
 }
 
 const CATEGORIES: { key: HealthLogCategory; label: string; mci: string }[] = [
@@ -46,12 +49,14 @@ const NOTE_CAREGIVER_TEMPLATES = [
   { label: 'Appetite', title: 'Appetite', notesPrefix: 'Appetite: ' },
 ] as const;
 
-export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
+export function AddHealthLogSheet({ visible, onClose, editing, photoPickerNonce = 0 }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
   const { user } = useAuthStore();
+  const userId = user?.id ?? null;
   const addLog = useAddHealthLog();
   const updateLog = useUpdateHealthLog();
+  const lastHandledPhotoPickerNonce = useRef(0);
 
   const [category, setCategory] = useState<HealthLogCategory>('symptom');
   const [title, setTitle] = useState('');
@@ -61,6 +66,15 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
   const [pickedPhoto, setPickedPhoto] = useState<{ uri: string; mimeType: string } | null>(null);
   const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const { data: existingPhotoUri } = useHealthLogPhotoUrl(
+    editing?.photo_path && !removeExistingPhoto ? editing.photo_path : null
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      lastHandledPhotoPickerNonce.current = 0;
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -86,7 +100,7 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
     setFormError(null);
   }
 
-  async function handlePickPhoto() {
+  const handlePickPhoto = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
       type: 'image/*',
       copyToCacheDirectory: true,
@@ -96,12 +110,27 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
     const mimeType = asset.mimeType ?? 'image/jpeg';
     setPickedPhoto({ uri: asset.uri, mimeType });
     setRemoveExistingPhoto(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !editing || !photoPickerNonce || photoPickerNonce <= lastHandledPhotoPickerNonce.current) {
+      return;
+    }
+    lastHandledPhotoPickerNonce.current = photoPickerNonce;
+    const id = requestAnimationFrame(() => {
+      void handlePickPhoto();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [visible, editing?.id, photoPickerNonce, handlePickPhoto]);
 
   async function handleSubmit() {
     setFormError(null);
     if (!title.trim()) {
       setFormError('Please enter a title.');
+      return;
+    }
+    if (!editing && !user?.id) {
+      Alert.alert('Session expired', 'Please sign in again to save this entry.');
       return;
     }
 
@@ -136,7 +165,7 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
           value: value.trim() || undefined,
           unit: unit.trim() || undefined,
           notes: notes.trim() || undefined,
-          logged_by: user!.id,
+          logged_by: userId!,
           photo: pickedPhoto ?? undefined,
         });
       }
@@ -236,7 +265,7 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
             value={title}
             onChangeText={(v) => { setTitle(v); setFormError(null); }}
             accessibilityLabel="Title"
-            accessibilityState={formError ? { invalid: true } : undefined}
+            accessibilityHint={formError ?? undefined}
           />
 
           {(category === 'vital' || category === 'symptom') ? (
@@ -295,9 +324,9 @@ export function AddHealthLogSheet({ visible, onClose, editing }: Props) {
           </View>
           {pickedPhoto ? (
             <Image source={{ uri: pickedPhoto.uri }} style={styles.photoPreview} resizeMode="cover" />
-          ) : editing?.photo_path && !removeExistingPhoto && healthLogPhotoPublicUrl(editing.photo_path) ? (
+          ) : existingPhotoUri ? (
             <Image
-              source={{ uri: healthLogPhotoPublicUrl(editing.photo_path)! }}
+              source={{ uri: existingPhotoUri }}
               style={styles.photoPreview}
               resizeMode="cover"
             />

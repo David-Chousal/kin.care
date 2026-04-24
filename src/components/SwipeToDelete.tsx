@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useTranslation } from 'react-i18next';
 import { Icon } from './Icon';
 import { useTheme, type Theme } from '../theme';
 
@@ -10,19 +11,25 @@ interface SwipeToDeleteProps {
   label?: string;
   /** Screen reader name for the row (used with the Delete accessibility action). */
   accessibilityLabel?: string;
+  /** Screen reader hint for the row (keep short; long strings may be truncated by VoiceOver). */
+  accessibilityHint?: string;
   rightThreshold?: number;
 }
 
 export function SwipeToDelete({
   onDelete,
   children,
-  label = 'Delete',
+  label,
   accessibilityLabel = 'Item',
+  accessibilityHint,
   rightThreshold = 40,
 }: SwipeToDeleteProps) {
+  const { t: tx } = useTranslation();
   const t = useTheme();
   const styles = makeStyles(t);
   const ref = useRef<Swipeable>(null);
+  const deleteLabel = label ?? tx('common.delete', { defaultValue: 'Delete' });
+  const hint = accessibilityHint ?? tx('common.a11y.swipeToRevealDeleteHint', { defaultValue: 'Swipe for delete.' });
 
   function renderRightActions(progress: Animated.AnimatedInterpolation<number>) {
     const translateX = progress.interpolate({
@@ -35,10 +42,10 @@ export function SwipeToDelete({
           style={styles.actionBtn}
           onPress={() => { ref.current?.close(); onDelete(); }}
           accessibilityRole="button"
-          accessibilityLabel={label}
+          accessibilityLabel={deleteLabel}
         >
-          <Icon name="trash" size={18} color={t.surface} />
-          <Text style={styles.actionText}>{label}</Text>
+          <Icon name="trash" size={20} color={t.surface} />
+          <Text style={styles.actionText}>{deleteLabel}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -49,13 +56,13 @@ export function SwipeToDelete({
       ref={ref}
       renderRightActions={renderRightActions}
       rightThreshold={rightThreshold}
+      overshootRight={false}
     >
       <View
-        style={{ flex: 1 }}
         accessible
         accessibilityLabel={accessibilityLabel}
-        accessibilityHint="Swipe up or down for actions."
-        accessibilityActions={[{ name: 'delete', label }]}
+        accessibilityHint={hint}
+        accessibilityActions={[{ name: 'delete', label: deleteLabel }]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === 'delete') {
             ref.current?.close();

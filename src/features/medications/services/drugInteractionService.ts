@@ -1,13 +1,36 @@
-import Groq from 'groq-sdk';
+import { SUPABASE_URL, getSupabaseAccessToken } from '../../../lib/supabase';
 
 const RXNORM_BASE = 'https://rxnav.nlm.nih.gov/REST';
 
-const groq = new Groq({
-  apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '',
-  dangerouslyAllowBrowser: true,
-});
-
 export type InteractionSeverity = 'mild' | 'moderate' | 'severe';
+
+const SEVERITY_RANK: Record<InteractionSeverity, number> = {
+  mild: 0,
+  moderate: 1,
+  severe: 2,
+};
+
+/**
+ * For each drug name appearing in interaction results (RxNorm / AI concept strings),
+ * returns the highest severity among all pairs involving that name.
+ * Keys are lowercased trimmed strings matching lookup from the medication list.
+ */
+export function worstSeverityByInteractionDrugName(
+  interactions: MedicationInteractionResult[],
+): Map<string, InteractionSeverity> {
+  const map = new Map<string, InteractionSeverity>();
+  for (const row of interactions) {
+    for (const raw of [row.medicationName1, row.medicationName2]) {
+      const key = raw.toLowerCase().trim();
+      if (!key) continue;
+      const prev = map.get(key);
+      if (!prev || SEVERITY_RANK[row.severity] > SEVERITY_RANK[prev]) {
+        map.set(key, row.severity);
+      }
+    }
+  }
+  return map;
+}
 
 export interface MedicationInteractionResult {
   medicationName1: string;
@@ -68,6 +91,8 @@ async function fetchRxNormInteractions(rxcuis: string[]): Promise<MedicationInte
   if (rxcuis.length < 2) return [];
 
   try {
+    // RxNav discontinued drug–drug interaction REST endpoints (~2024); this often 404s.
+    // Callers fall back to AI screening when this returns nothing.
     const url = `${RXNORM_BASE}/interaction/list.json?rxcuis=${rxcuis.join('+')}`;
     const res = await fetch(url);
     if (!res.ok) return [];
@@ -101,31 +126,31 @@ async function fetchRxNormInteractions(rxcuis: string[]): Promise<MedicationInte
 }
 
 async function checkInteractionViaAI(
-  drugName1: string,
-  drugName2: string,
+  newDrugName: string,
+  existingMedicationId: string,
+  existingMedicationName: string,
+  familyId: string,
 ): Promise<MedicationInteractionResult | null> {
   try {
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        {
-          role: 'user',
-          content: `Are there any clinically significant drug interactions between "${drugName1}" and "${drugName2}"?
+    const token = await getSupabaseAccessToken();
+    if (!token || !familyId) return null;
 
-Respond ONLY with a JSON object (no markdown) in this exact format:
-{"hasInteraction":false,"severity":"none","description":""}
-or
-{"hasInteraction":true,"severity":"mild"|"moderate"|"severe","description":"brief clinical description"}`,
-        },
-      ],
-      temperature: 0,
-      max_tokens: 150,
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/llm-gateway/drug-interactions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        family_id: familyId,
+        new_drug_name: newDrugName,
+        existing_medication_id: existingMedicationId,
+      }),
     });
 
-    const text = completion.choices[0]?.message?.content?.trim() ?? '';
-    // Strip any markdown code fences if present
-    const json = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-    const result = JSON.parse(json) as {
+    if (!res.ok) return null;
+
+    const result = (await res.json()) as {
       hasInteraction: boolean;
       severity: string;
       description: string;
@@ -138,10 +163,10 @@ or
       : 'moderate';
 
     return {
-      medicationName1: drugName1,
-      medicationName2: drugName2,
+      medicationName1: newDrugName,
+      medicationName2: existingMedicationName,
       severity,
-      description: result.description,
+      description: String(result.description ?? ''),
       source: 'ai',
     };
   } catch {
@@ -149,18 +174,60 @@ or
   }
 }
 
+async function fetchFamilyInteractionsBatchAI(
+  familyId: string,
+): Promise<MedicationInteractionResult[]> {
+  try {
+    const token = await getSupabaseAccessToken();
+    if (!token || !familyId) return [];
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/llm-gateway/drug-interactions-family`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ family_id: familyId }),
+    });
+
+    if (!res.ok) return [];
+
+    const body = (await res.json()) as {
+      interactions?: Array<{
+        medicationName1: string;
+        medicationName2: string;
+        severity: InteractionSeverity;
+        description: string;
+      }>;
+    };
+
+    const rows = body.interactions ?? [];
+    return rows.map((r) => ({
+      medicationName1: r.medicationName1,
+      medicationName2: r.medicationName2,
+      severity: ['mild', 'moderate', 'severe'].includes(r.severity) ? r.severity : 'moderate',
+      description: String(r.description ?? ''),
+      source: 'ai' as const,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Check a new drug against a list of existing drugs.
- * Uses RxNorm for drugs it recognises; falls back to Groq AI for unknowns.
+ * Uses RxNorm for drugs it recognises; falls back to server-side AI for unknowns.
  * Returns only interactions that involve newDrugName.
+ * @param familyId Required for AI fallback (server resolves listed drugs by medication id).
  */
 export async function checkAllInteractions(
   newDrugName: string,
-  existingDrugNames: string[],
+  existingMedications: Array<{ id: string; name: string }>,
+  familyId: string,
 ): Promise<MedicationInteractionResult[]> {
-  if (existingDrugNames.length === 0) return [];
+  if (existingMedications.length === 0) return [];
 
-  const allNames = [newDrugName, ...existingDrugNames];
+  const allNames = [newDrugName, ...existingMedications.map((m) => m.name)];
 
   // Look up RxCUIs for all drugs in parallel
   const rxcuiEntries = await Promise.all(
@@ -178,28 +245,49 @@ export async function checkAllInteractions(
   // Batch RxNorm interaction check for all recognised drugs
   if (withRxcui.length >= 2) {
     const rxNormResults = await fetchRxNormInteractions(withRxcui.map((e) => e.rxcui));
-    // Filter to pairs that involve the new drug (case-insensitive)
-    const newLower = newDrugName.toLowerCase();
-    for (const r of rxNormResults) {
-      if (r.medicationName1.toLowerCase() === newLower || r.medicationName2.toLowerCase() === newLower) {
-        results.push(r);
-      }
-    }
-    // If new drug was found in RxNorm, don't fall back to AI for the found pairs
-    const newDrugInRxNorm = withRxcui.some((e) => e.name.toLowerCase() === newLower);
+    const newLower = newDrugName.toLowerCase().trim();
+    const rxInvolvingNew = rxNormResults.filter(
+      (r) =>
+        r.medicationName1.toLowerCase().trim() === newLower ||
+        r.medicationName2.toLowerCase().trim() === newLower,
+    );
+    results.push(...rxInvolvingNew);
+
+    const newDrugInRxNorm = withRxcui.some((e) => e.name.toLowerCase().trim() === newLower);
     if (newDrugInRxNorm) {
-      // Still run AI for existing drugs that weren't in RxNorm
-      const aiChecks = withoutRxcui
-        .filter((name) => name.toLowerCase() !== newLower)
-        .map((name) => checkInteractionViaAI(newDrugName, name));
-      const aiResults = await Promise.all(aiChecks);
-      results.push(...aiResults.filter((r): r is MedicationInteractionResult => r !== null));
+      const aiForUnrecognised = await Promise.all(
+        withoutRxcui
+          .filter((name) => name.toLowerCase().trim() !== newLower)
+          .map((name) => {
+            const med = existingMedications.find(
+              (m) => m.name.toLowerCase().trim() === name.toLowerCase().trim(),
+            );
+            if (!med) return Promise.resolve(null);
+            return checkInteractionViaAI(newDrugName, med.id, med.name, familyId);
+          }),
+      );
+      results.push(...aiForUnrecognised.filter((r): r is MedicationInteractionResult => r !== null));
+
+      // RxNorm interaction data is often unavailable (discontinued API). If it returned nothing
+      // involving the new drug, AI-screen against existing meds that RxNorm did resolve.
+      if (rxInvolvingNew.length === 0) {
+        const existingInRxNorm = existingMedications.filter((m) =>
+          withRxcui.some((e) => e.name.toLowerCase().trim() === m.name.toLowerCase().trim()),
+        );
+        const aiFallback = await Promise.all(
+          existingInRxNorm.map((m) => checkInteractionViaAI(newDrugName, m.id, m.name, familyId)),
+        );
+        results.push(...aiFallback.filter((r): r is MedicationInteractionResult => r !== null));
+      }
+
       return deduplicateInteractions(results);
     }
   }
 
   // New drug not in RxNorm (or no drugs recognised) — use AI for all pairs
-  const aiChecks = existingDrugNames.map((name) => checkInteractionViaAI(newDrugName, name));
+  const aiChecks = existingMedications.map((m) =>
+    checkInteractionViaAI(newDrugName, m.id, m.name, familyId),
+  );
   const aiResults = await Promise.all(aiChecks);
   results.push(...aiResults.filter((r): r is MedicationInteractionResult => r !== null));
 
@@ -209,13 +297,16 @@ export async function checkAllInteractions(
 /**
  * Check all pairwise interactions for a family's medication list.
  * Uses a single batched RxNorm call for efficiency; AI fallback for unknown drugs.
- * Caps at 15 medications (105 pairs) to stay within reasonable API limits.
+ * Caps at 15 medications to stay within reasonable API limits.
+ * Uses RxNorm when available; otherwise one batched AI screen via llm-gateway.
  */
 export async function checkFamilyInteractions(
-  medications: Array<{ name: string }>,
+  medications: Array<{ name: string; family_id?: string }>,
 ): Promise<MedicationInteractionResult[]> {
   const capped = medications.slice(0, 15);
   if (capped.length < 2) return [];
+
+  const familyId = capped.map((m) => m.family_id?.trim()).find((id) => id && id.length > 0) ?? '';
 
   const rxcuiEntries = await Promise.all(
     capped.map(async (m) => ({ name: m.name, rxcui: await lookupRxCui(m.name) })),
@@ -231,6 +322,11 @@ export async function checkFamilyInteractions(
   if (withRxcui.length >= 2) {
     const rxNormResults = await fetchRxNormInteractions(withRxcui.map((e) => e.rxcui));
     results.push(...rxNormResults);
+  }
+
+  if (results.length === 0 && familyId) {
+    const aiRows = await fetchFamilyInteractionsBatchAI(familyId);
+    results.push(...aiRows);
   }
 
   return deduplicateInteractions(results);

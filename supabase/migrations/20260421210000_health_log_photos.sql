@@ -6,12 +6,12 @@ alter table public.health_logs
 comment on column public.health_logs.photo_path is
   'Object path inside bucket health-log-photos (family_id/filename).';
 
--- Bucket for wound / progression images (public URLs; path is unguessable).
+-- Bucket for wound / progression images (private; clients must use signed URLs).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'health-log-photos',
   'health-log-photos',
-  true,
+  false,
   10485760,
   array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']
 )

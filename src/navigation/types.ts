@@ -1,7 +1,20 @@
+import type { FeatureId } from '../subscription/featureTierConfig';
+
 export type MainStackParamList = {
   Home: undefined;
   Tasks: undefined;
-  Calendar: undefined;
+  Calendar:
+    | {
+        openAdd?: boolean;
+        draft?: {
+          title?: string;
+          description?: string;
+          location?: string;
+          startsAt?: string;
+          includeTime?: boolean;
+        };
+      }
+    | undefined;
   VisitPrep: undefined;
   Doctors: undefined;
   Medications: undefined;
@@ -18,10 +31,13 @@ export type MainStackParamList = {
   Language: undefined;
   DataPrivacy: undefined;
   Notes: undefined;
+  Subscription: { featureId?: FeatureId } | undefined;
 };
 
 export type AuthStackParamList = {
-  Welcome: undefined;
+  WelcomeHub: undefined;
   SignIn: undefined;
   SignUp: undefined;
+  ForgotPassword: undefined;
+  JoinFamilyInfo: undefined;
 };

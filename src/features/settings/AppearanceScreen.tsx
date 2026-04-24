@@ -1,15 +1,17 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeStore, type ColorSchemePreference } from '../../store/theme';
 import { useTheme, type Theme } from '../../theme';
-const SCHEME_OPTIONS: { key: ColorSchemePreference; label: string }[] = [
-  { key: 'light', label: 'Light' },
-  { key: 'dark', label: 'Dark' },
-  { key: 'system', label: 'System' },
+const SCHEME_OPTIONS: Array<{ key: ColorSchemePreference; labelKey: string }> = [
+  { key: 'light', labelKey: 'settings.appearance.options.light' },
+  { key: 'dark', labelKey: 'settings.appearance.options.dark' },
+  { key: 'system', labelKey: 'settings.appearance.options.system' },
 ];
 
 export function AppearanceScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const { colorScheme, setColorScheme } = useThemeStore();
 
   return (
@@ -21,9 +23,9 @@ export function AppearanceScreen() {
         contentContainerStyle={styles.scrollContent}
       >
           <View style={styles.card}>
-            <Text style={styles.appearanceLabel}>Color scheme</Text>
+            <Text style={styles.appearanceLabel}>{tx('settings.appearance.colorSchemeLabel')}</Text>
             <View style={styles.schemeSelector}>
-              {SCHEME_OPTIONS.map(({ key, label }) => (
+              {SCHEME_OPTIONS.map(({ key, labelKey }) => (
                 <TouchableOpacity
                   key={key}
                   style={[styles.schemeOption, colorScheme === key && styles.schemeOptionActive]}
@@ -31,7 +33,7 @@ export function AppearanceScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.schemeLabel, colorScheme === key && styles.schemeLabelActive]}>
-                    {label}
+                    {tx(labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}

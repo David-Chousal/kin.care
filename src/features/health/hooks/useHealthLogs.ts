@@ -6,10 +6,25 @@ import type { HealthLog, HealthLogCategory } from '../../../types';
 
 const HEALTH_LOG_PHOTOS_BUCKET = 'health-log-photos';
 
-export function healthLogPhotoPublicUrl(filePath: string | null | undefined): string | null {
-  if (!filePath) return null;
-  const { data } = supabase.storage.from(HEALTH_LOG_PHOTOS_BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
+/** Short-lived signed URLs for rendering photos; do not use getPublicUrl for this bucket. */
+export const HEALTH_LOG_PHOTOS_SIGNED_URL_EXPIRY_SEC = 300;
+
+async function createHealthLogPhotoSignedUrl(filePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(HEALTH_LOG_PHOTOS_BUCKET)
+    .createSignedUrl(filePath, HEALTH_LOG_PHOTOS_SIGNED_URL_EXPIRY_SEC);
+  if (error || !data?.signedUrl) throw error ?? new Error('Missing signed URL');
+  return data.signedUrl;
+}
+
+export function useHealthLogPhotoUrl(filePath: string | null | undefined) {
+  return useQuery({
+    queryKey: ['health_log_photo_url', filePath],
+    enabled: !!filePath,
+    queryFn: async () => createHealthLogPhotoSignedUrl(filePath!),
+    // Keep a little buffer so we refresh before expiry.
+    staleTime: (HEALTH_LOG_PHOTOS_SIGNED_URL_EXPIRY_SEC - 30) * 1000,
+  });
 }
 
 async function uploadHealthLogPhoto(familyId: string, uri: string, mimeType: string): Promise<string> {

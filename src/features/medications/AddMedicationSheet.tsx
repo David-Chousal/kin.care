@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { requestNotificationPermission } from '../notifications/requestNotificationPermission';
 import { useAuthStore } from '../../store/auth';
+import { useFamilyStore } from '../../store/family';
 import { useAddMedication, useUpdateMedication, useMedications } from './hooks/useMedications';
+import { useFamilyDoctors, useUpdateFamilyDoctor } from '../doctors/hooks/useFamilyDoctors';
 import { checkAllInteractions, type MedicationInteractionResult } from './services/drugInteractionService';
 import {
   useTheme,
@@ -32,6 +34,7 @@ import {
   clampMinutes,
   dailyFrequencyLabel,
   inferFrequencyTypeFromLegacyFrequency,
+  medicationStructuredScheduleFields,
   minutesFromTimeStrings,
   minutesToHHMM,
   sortUniqueHHMMFromMinutes,
@@ -78,9 +81,12 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
   const { user } = useAuthStore();
+  const family = useFamilyStore((s) => s.family);
   const addMedication = useAddMedication();
   const updateMedication = useUpdateMedication();
+  const updateDoctor = useUpdateFamilyDoctor();
   const { data: existingMedications } = useMedications();
+  const { data: doctors } = useFamilyDoctors();
 
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -92,6 +98,8 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
   const [refillThreshold, setRefillThreshold] = useState('');
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [prescriberIds, setPrescriberIds] = useState<Set<string>>(() => new Set());
+  const prescribersInitRef = useRef<string | null>(null);
 
   const hydrateFromMedication = useCallback((m: Medication) => {
     const mode = scheduleModeFromMedication(m);
@@ -127,6 +135,30 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
     }
   }, [visible, editing?.id, hydrateFromMedication]);
 
+  useEffect(() => {
+    if (!visible) {
+      prescribersInitRef.current = null;
+      return;
+    }
+    if (!editing) {
+      if (prescribersInitRef.current !== 'new') {
+        prescribersInitRef.current = 'new';
+        setPrescriberIds(new Set());
+      }
+      return;
+    }
+    if (!doctors) return;
+    if (prescribersInitRef.current === editing.id) return;
+    prescribersInitRef.current = editing.id;
+    setPrescriberIds(
+      new Set(
+        doctors
+          .filter((d) => (d.linked_medication_ids ?? []).includes(editing.id))
+          .map((d) => d.id),
+      ),
+    );
+  }, [visible, editing, doctors]);
+
   function reset() {
     setName('');
     setDosage('');
@@ -136,7 +168,42 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
     setTimeMinutes([DEFAULT_MINUTES]);
     setQuantityRemaining('');
     setRefillThreshold('');
+    setPrescriberIds(new Set());
     setFormError(null);
+  }
+
+  function togglePrescriber(doctorId: string) {
+    hapticSelection();
+    setPrescriberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(doctorId)) next.delete(doctorId);
+      else next.add(doctorId);
+      return next;
+    });
+  }
+
+  async function syncPrescriberLinks(medicationId: string, selected: Set<string>) {
+    const list = doctors ?? [];
+    const tasks: Promise<unknown>[] = [];
+    for (const doc of list) {
+      const ids = doc.linked_medication_ids ?? [];
+      const has = ids.includes(medicationId);
+      const want = selected.has(doc.id);
+      if (has === want) continue;
+      const nextIds = want ? [...ids, medicationId] : ids.filter((i) => i !== medicationId);
+      tasks.push(
+        updateDoctor.mutateAsync({
+          id: doc.id,
+          name: doc.name,
+          specialty: doc.specialty ?? undefined,
+          phone: doc.phone ?? undefined,
+          address: doc.address ?? undefined,
+          next_appointment_at: doc.next_appointment_at,
+          linked_medication_ids: nextIds,
+        }),
+      );
+    }
+    await Promise.all(tasks);
   }
 
   function toggleDay(d: number) {
@@ -205,8 +272,10 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
     times: string[] | null,
     parsedQty: number | null,
     parsedThreshold: number | null,
+    prescribersSnapshot: Set<string>,
   ) {
     if (!user?.id) return;
+    const structured = medicationStructuredScheduleFields(scheduleMode, timeMinutes, selectedDays);
     try {
       if (editing) {
         await updateMedication.mutateAsync({
@@ -214,22 +283,44 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
           name: name.trim(),
           dosage: dosage.trim(),
           frequency,
-          times,
+          times: structured.times,
+          frequency_type: structured.frequency_type,
+          times_per_day: structured.times_per_day,
+          days_of_week: structured.days_of_week,
           notes: notes.trim() || undefined,
           quantity_remaining: parsedQty,
           refill_threshold: parsedThreshold,
         });
+        try {
+          await syncPrescriberLinks(editing.id, prescribersSnapshot);
+        } catch {
+          Alert.alert(
+            'Prescriber link',
+            'Medication was saved. You can link or fix prescribers from the Doctors screen.',
+          );
+        }
       } else {
-        await addMedication.mutateAsync({
+        const created = await addMedication.mutateAsync({
           name: name.trim(),
           dosage: dosage.trim(),
           frequency,
-          times,
+          times: structured.times,
+          frequency_type: structured.frequency_type,
+          times_per_day: structured.times_per_day,
+          days_of_week: structured.days_of_week,
           notes: notes.trim() || undefined,
           created_by: user.id,
           quantity_remaining: parsedQty,
           refill_threshold: parsedThreshold,
         });
+        try {
+          await syncPrescriberLinks(created.id, prescribersSnapshot);
+        } catch {
+          Alert.alert(
+            'Prescriber link',
+            'Medication was saved. You can link this medication to a doctor from the Doctors screen.',
+          );
+        }
         // Prompt for notification permission after saving a scheduled medication.
         // Closes the sheet first so the rationale isn't buried under the modal.
         if (scheduleMode !== 'as_needed') {
@@ -261,13 +352,22 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
         const other = i.medicationName1.toLowerCase() === name.trim().toLowerCase()
           ? i.medicationName2
           : i.medicationName1;
-        return `${other} (${i.severity}): ${i.description}`;
+        const src = i.source === 'rxnorm' ? 'RxNorm' : 'AI';
+        return `${other} (${i.severity}) [${src}]: ${i.description}`;
       })
       .join('\n\n');
 
     Alert.alert(
       title,
-      `${name.trim()} may interact with:\n\n${lines}\n\nPlease consult a healthcare provider before adding.`,
+      [
+        `${name.trim()} may interact with:`,
+        '',
+        lines,
+        '',
+        'This is a screening check, not medical advice. Verify with a pharmacist or clinician.',
+        'Do not start, stop, or change medications based on this alone.',
+        'If you think this may be an emergency, call local emergency services.',
+      ].join('\n'),
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -320,14 +420,21 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
       return;
     }
 
-    const proceed = () => saveMedication(frequency, times, parsedQty, parsedThreshold);
+    const prescribersSnapshot = new Set(prescriberIds);
+    const proceed = () => saveMedication(frequency, times, parsedQty, parsedThreshold, prescribersSnapshot);
 
     // Only check interactions when adding (not editing) and there are existing meds
     if (!editing && existingMedications && existingMedications.length > 0) {
       setIsCheckingInteractions(true);
       try {
-        const existingNames = existingMedications.map((m) => m.name);
-        const interactions = await checkAllInteractions(name.trim(), existingNames);
+        const existingForCheck = existingMedications.map((m) => ({ id: m.id, name: m.name }));
+        const fid = family?.id ?? existingMedications[0]?.family_id;
+        if (!fid) {
+          setIsCheckingInteractions(false);
+          await proceed();
+          return;
+        }
+        const interactions = await checkAllInteractions(name.trim(), existingForCheck, fid);
         setIsCheckingInteractions(false);
         if (interactions.length > 0) {
           showInteractionAlert(interactions, proceed);
@@ -342,7 +449,8 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
     await proceed();
   }
 
-  const isPending = addMedication.isPending || updateMedication.isPending || isCheckingInteractions;
+  const isPending =
+    addMedication.isPending || updateMedication.isPending || updateDoctor.isPending || isCheckingInteractions;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -359,7 +467,7 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
           <Text style={styles.title}>{editing ? 'Edit Medication' : 'Add Medication'}</Text>
           <TouchableOpacity onPress={handleSubmit} disabled={isPending}>
             <Text style={[styles.save, isPending && styles.disabled]}>
-              {isCheckingInteractions ? 'Checking…' : (addMedication.isPending || updateMedication.isPending) ? 'Saving…' : 'Save'}
+              {isCheckingInteractions ? 'Checking…' : (addMedication.isPending || updateMedication.isPending || updateDoctor.isPending) ? 'Saving…' : 'Save'}
             </Text>
           </TouchableOpacity>
         </BlurredHeaderBar>
@@ -409,6 +517,36 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
               />
             </View>
           </View>
+
+          <Text style={styles.sectionHeader}>Prescriber (optional)</Text>
+          <Text style={styles.reminderHint}>
+            Link this medication to one or more doctors. You can also manage links from the Doctors tab.
+          </Text>
+          {!doctors || doctors.length === 0 ? (
+            <Text style={styles.emptyDoctorsHint}>
+              No doctors yet — add them under Doctors, then you can link prescribers here.
+            </Text>
+          ) : (
+            <View style={styles.chips}>
+              {doctors.map((doc) => {
+                const selected = prescriberIds.has(doc.id);
+                return (
+                  <TouchableOpacity
+                    key={doc.id}
+                    style={[styles.chip, selected && styles.chipActive]}
+                    onPress={() => togglePrescriber(doc.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${doc.name}${selected ? ', selected as prescriber' : ''}`}
+                  >
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]} numberOfLines={1}>
+                      {doc.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           <Text style={styles.label}>Schedule</Text>
           <View style={styles.segmentBar}>
@@ -460,6 +598,9 @@ export function AddMedicationSheet({ visible, onClose, editing }: Props) {
           {scheduleMode !== 'as_needed' ? (
             <>
               <Text style={styles.label}>Times</Text>
+              <Text style={styles.reminderHint}>
+                When medication alerts are on, we notify you at each dose time below. Change times here anytime.
+              </Text>
               {timeMinutes.map((mins, index) => (
                 <View key={index} style={styles.timeRow}>
                   <Text
@@ -544,6 +685,13 @@ function makeStyles(t: Theme) {
     disabled: { opacity: 0.5 },
     form: { padding: 20, gap: 6 },
     label: { fontSize: 13, fontWeight: '600', color: t.textSecondary, marginTop: 12 },
+    reminderHint: {
+      fontSize: 12,
+      lineHeight: 16,
+      color: t.textTertiary,
+      marginTop: 4,
+      marginBottom: 2,
+    },
     input: {
       backgroundColor: t.surface,
       borderRadius: 12,
@@ -612,5 +760,11 @@ function makeStyles(t: Theme) {
       textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 2,
     },
     refillRow: { flexDirection: 'row', gap: 12 },
+    emptyDoctorsHint: {
+      fontSize: 14,
+      color: t.textTertiary,
+      marginTop: 4,
+      lineHeight: 20,
+    },
   });
 }

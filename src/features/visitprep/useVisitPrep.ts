@@ -1,82 +1,101 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Groq from 'groq-sdk';
-import { supabase } from '../../lib/supabase';
+import { useTranslation } from 'react-i18next';
+import { SUPABASE_URL, getSupabaseAccessToken, supabase } from '../../lib/supabase';
 import { useFamilyStore } from '../../store/family';
 import { useAuthStore } from '../../store/auth';
-import type { Medication, HealthLog, VisitPrepSummary } from '../../types';
+import type { VisitPrepSummary } from '../../types';
 import { errorMessageFromUnknown } from '../../lib/errorMessage';
-import { formatHealthTrendSummaryForPrompt } from '../health/healthVitalSignals';
+import { parseLlmGatewayResponseError } from '../../subscription/llmGatewayErrors';
+import { userMessageFromLlmGatewayError } from '../../subscription/llmGatewayUserMessages';
 
-const client = new Groq({
-  apiKey: process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '',
-  dangerouslyAllowBrowser: true,
-});
+const VISIT_PREP_CLIENT_TIMEOUT_MS = 180_000;
+const VISIT_PREP_STREAM_INACTIVITY_MS = 20_000;
+const VISIT_PREP_TOKEN_TIMEOUT_MS = 8_000;
 
-function buildPrompt(
-  medications: Medication[],
-  healthLogs: HealthLog[],
-  careRecipientName: string
-): string {
-  const medList = medications.length > 0
-    ? medications
-        .map((m) => `- ${m.name} ${m.dosage}, ${m.frequency}${m.notes ? ` (${m.notes})` : ''}`)
-        .join('\n')
-    : 'None recorded';
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let id: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    id = setTimeout(() => reject(new Error('timeout')), ms);
+  });
+  try {
+    return (await Promise.race([p, timeout])) as T;
+  } finally {
+    if (id) clearTimeout(id);
+  }
+}
 
-  const logsByCategory = healthLogs.reduce<Record<string, HealthLog[]>>((acc, log) => {
-    if (!acc[log.category]) acc[log.category] = [];
-    acc[log.category].push(log);
-    return acc;
-  }, {});
+function isAbortError(e: unknown): boolean {
+  return (
+    (e instanceof DOMException && e.name === 'AbortError') ||
+    (e instanceof Error && e.name === 'AbortError')
+  );
+}
 
-  const logSections = Object.entries(logsByCategory)
-    .map(([cat, logs]) => {
-      const entries = logs
-        .slice(0, 10)
-        .map((l) => {
-          const date = new Date(l.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const val = l.value ? ` — ${l.value}${l.unit ? ` ${l.unit}` : ''}` : '';
-          const photo = l.photo_path ? ' [photo attached]' : '';
-          return `  • ${date}: ${l.title}${val}${l.notes ? ` (${l.notes})` : ''}${photo}`;
-        })
-        .join('\n');
-      return `${cat.toUpperCase()}:\n${entries}`;
-    })
-    .join('\n\n');
-
-  const trendLines = formatHealthTrendSummaryForPrompt(healthLogs);
-
-  return `You are a helpful family caregiver assistant. Prepare a concise doctor visit summary for a care recipient.
-
-CURRENT MEDICATIONS:
-${medList}
-
-VITAL TRENDS (parsed from logs when available):
-${trendLines || 'No structured BP/weight trend (need multiple parseable readings).'}
-
-RECENT HEALTH LOG (last 30 days):
-${logSections || 'No entries recorded'}
-
-Please produce a visit prep summary with these sections:
-1. **Key Concerns to Discuss** — top 3–5 issues based on recent health log
-2. **Medication Review** — current medications, flag anything worth reviewing
-3. **Questions to Ask the Doctor** — 3–5 suggested questions based on the data
-4. **Trends to Watch** — any patterns in vitals or symptoms worth monitoring
-
-Keep it concise and practical. Use plain language a family caregiver can read aloud. Do not include the care recipient's name or any identifying information in your response.`;
+/** RN Hermes often has no `crypto` global; only needs uniqueness per run for React keys. */
+function newSummaryRunId(): string {
+  try {
+    const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+    if (c && typeof c.randomUUID === 'function') {
+      return c.randomUUID();
+    }
+  } catch {
+    // Hermes / JSC may throw when touching `crypto` on globalThis
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 export function useVisitPrep() {
+  const { t } = useTranslation();
   const family = useFamilyStore((s) => s.family);
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [summary, setSummary] = useState('');
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  /** Single state so loading + debug stage cannot diverge (Strict Mode / overlapping runs). */
+  const [genUi, setGenUi] = useState<{ loading: boolean; stage: string }>({ loading: false, stage: '' });
+  const isLoading = genUi.loading;
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
+  /** Stable React keys for markdown lines; new id each `generate()` so lists reconcile correctly. */
+  const [summaryId, setSummaryId] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const debugStageRef = useRef('');
+  const generateGenerationRef = useRef(0);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const safeSetSummary = (v: string) => {
+    if (mountedRef.current) setSummary(v);
+  };
+  const safeSetGeneratedAt = (v: string | null) => {
+    if (mountedRef.current) setGeneratedAt(v);
+  };
+  /** Always set `loading: true` with the stage — never spread `{ ...s, stage }` or a stale render can leave `loading: false` (no spinner). */
+  const showGenProgress = (stage: string) => {
+    debugStageRef.current = stage;
+    setGenUi({ loading: true, stage });
+  };
+  const safeSetError = (v: string | null) => {
+    setError(v);
+  };
+  const safeSetSubscriptionBlocked = (v: boolean) => {
+    if (mountedRef.current) setSubscriptionBlocked(v);
+  };
+  const safeSetPersistError = (v: string | null) => {
+    if (mountedRef.current) setPersistError(v);
+  };
+  const safeSetSummaryId = (v: string) => {
+    if (mountedRef.current) setSummaryId(v);
+  };
   const historyQuery = useQuery({
     queryKey: ['visitPrepSummaries', family?.id],
     enabled: !!family?.id,
@@ -97,54 +116,178 @@ export function useVisitPrep() {
   });
 
   async function generate() {
-    if (!family) return;
-    setIsLoading(true);
-    setError(null);
-    setPersistError(null);
-    setSummary('');
-    setGeneratedAt(null);
+    const fam = useFamilyStore.getState().family;
+    if (!fam) {
+      if (__DEV__) console.warn('[VisitPrep] generate skipped: no family in store');
+      return;
+    }
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const generation = ++generateGenerationRef.current;
+
+    // Show spinner immediately — before summary-id / clears that can throw or be skipped when unmounted.
+    showGenProgress('start');
+
+    safeSetError(null);
+    safeSetSubscriptionBlocked(false);
+    safeSetPersistError(null);
+    safeSetSummary('');
+    safeSetGeneratedAt(null);
+    safeSetSummaryId(newSummaryRunId());
+
+    let clientTimedOut = false;
+    let clientInactivityTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      clientTimedOut = true;
+      controller.abort();
+    }, VISIT_PREP_CLIENT_TIMEOUT_MS);
+    /** Stream idle watchdog — start only once we are reading NDJSON/stream (not during auth/fetch). */
+    let inactivityId: ReturnType<typeof setTimeout> | null = null;
+    const bumpInactivity = () => {
+      if (inactivityId) clearTimeout(inactivityId);
+      inactivityId = setTimeout(() => {
+        clientInactivityTimedOut = true;
+        controller.abort();
+      }, VISIT_PREP_STREAM_INACTIVITY_MS);
+    };
 
     try {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      showGenProgress('auth:getSession');
+      const token = await withTimeout(getSupabaseAccessToken(), VISIT_PREP_TOKEN_TIMEOUT_MS);
+      if (!token) {
+        throw new Error('Sign in to generate a summary.');
+      }
+      showGenProgress('auth:token ok');
 
-      const [medsResult, logsResult] = await Promise.all([
-        supabase
-          .from('medications')
-          .select('*')
-          .eq('family_id', family.id)
-          .eq('active', true),
-        supabase
-          .from('health_logs')
-          .select('*')
-          .eq('family_id', family.id)
-          .gte('logged_at', thirtyDaysAgo)
-          .order('logged_at', { ascending: false }),
-      ]);
-
-      if (medsResult.error) throw medsResult.error;
-      if (logsResult.error) throw logsResult.error;
-
-      const prompt = buildPrompt(
-        medsResult.data as Medication[],
-        logsResult.data as HealthLog[],
-        family.care_recipient_name
-      );
-
-      const message = await client.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
+      const url = `${SUPABASE_URL}/functions/v1/llm-gateway/visit-prep`;
+      showGenProgress(`fetch:requesting ${SUPABASE_URL}`);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ family_id: fam.id }),
+        signal: controller.signal,
       });
 
-      const text = message.choices[0]?.message?.content ?? '';
-      setSummary(text);
+      const gw = res.headers.get('x-kin-llm-gateway') ?? res.headers.get('X-Kin-Llm-Gateway');
+      showGenProgress(`fetch:headers ok${gw ? ` gateway=${gw}` : ''}`);
+
+      if (!res.ok) {
+        const parsed = await parseLlmGatewayResponseError(res);
+        safeSetSubscriptionBlocked(parsed.kind === 'subscription_required');
+        throw new Error(userMessageFromLlmGatewayError(parsed));
+      }
+
+      const body = res.body as unknown as ReadableStream<Uint8Array> | null;
+      let full = '';
+      showGenProgress('stream:begin');
+      bumpInactivity();
+
+      if (!body || typeof (body as ReadableStream<Uint8Array>).getReader !== 'function') {
+        const ndjson = await res.text();
+        const lines = ndjson.split('\n').map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          let evt: { type?: string; text?: string; message?: string };
+          try {
+            evt = JSON.parse(line) as { type?: string; text?: string; message?: string };
+          } catch {
+            continue;
+          }
+          bumpInactivity();
+          if (evt.type === 'delta' && evt.text) full += evt.text;
+          if (evt.type === 'done' && typeof evt.text === 'string') full = evt.text;
+          if (evt.type === 'error') throw new Error(evt.message || 'LLM error');
+        }
+        safeSetSummary(full);
+      } else {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let sawDone = false;
+
+        try {
+          while (true) {
+            if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+            const { value, done } = await reader.read();
+            if (done) break;
+            bumpInactivity();
+            buffer += decoder.decode(value, { stream: true });
+
+            let idx: number;
+            while ((idx = buffer.indexOf('\n')) !== -1) {
+              if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+              const line = buffer.slice(0, idx).trim();
+              buffer = buffer.slice(idx + 1);
+              if (!line) continue;
+
+              let evt: { type?: string; text?: string; message?: string };
+              try {
+                evt = JSON.parse(line) as { type?: string; text?: string; message?: string };
+              } catch {
+                continue;
+              }
+              bumpInactivity();
+              if (evt.type === 'delta' && evt.text) {
+                full += evt.text;
+                safeSetSummary(full);
+              } else if (evt.type === 'done') {
+                if (typeof evt.text === 'string') {
+                  full = evt.text;
+                  safeSetSummary(full);
+                }
+                sawDone = true;
+                break;
+              } else if (evt.type === 'error') {
+                throw new Error(evt.message || 'LLM error');
+              }
+            }
+            if (sawDone) break;
+          }
+
+          // Handle a final line without trailing newline (common when server closes right after "done")
+          if (!sawDone) {
+            const last = buffer.trim();
+            if (last) {
+              try {
+                const evt = JSON.parse(last) as { type?: string; text?: string; message?: string };
+                if (evt.type === 'delta' && evt.text) {
+                  full += evt.text;
+                  safeSetSummary(full);
+                } else if (evt.type === 'done') {
+                  if (typeof evt.text === 'string') {
+                    full = evt.text;
+                    safeSetSummary(full);
+                  }
+                } else if (evt.type === 'error') {
+                  throw new Error(evt.message || 'LLM error');
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        } finally {
+          try {
+            await reader.cancel();
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      const text = full.trim();
+      showGenProgress(`stream:done chars=${text.length}`);
 
       const at = new Date().toISOString();
       if (user?.id && text.trim()) {
         const ins = await supabase
           .from('visit_prep_summaries')
           .insert({
-            family_id: family.id,
+            family_id: fam.id,
             content: text,
             generated_at: at,
             created_by: user.id,
@@ -152,37 +295,63 @@ export function useVisitPrep() {
           .select('generated_at')
           .single();
         if (ins.error) {
-          setPersistError(errorMessageFromUnknown(ins.error));
-          setGeneratedAt(at);
+          safeSetPersistError(errorMessageFromUnknown(ins.error));
+          safeSetGeneratedAt(at);
         } else {
-          setPersistError(null);
+          safeSetPersistError(null);
           if (ins.data?.generated_at) {
-            setGeneratedAt(ins.data.generated_at);
+            safeSetGeneratedAt(ins.data.generated_at);
           } else {
-            setGeneratedAt(at);
+            safeSetGeneratedAt(at);
           }
-          void queryClient.invalidateQueries({ queryKey: ['visitPrepSummaries', family.id] });
+          void queryClient.invalidateQueries({ queryKey: ['visitPrepSummaries', fam.id] });
         }
       } else {
-        setGeneratedAt(at);
+        safeSetGeneratedAt(at);
         if (!user?.id) {
-          setPersistError('Sign in to save summaries to History.');
+          safeSetPersistError('Sign in to save summaries to History.');
         } else if (!text.trim()) {
-          setPersistError(null);
+          safeSetPersistError(null);
         }
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to generate summary.');
+      if (isAbortError(e)) {
+        if (clientTimedOut) {
+          safeSetError(t('visitPrep.generationTimeout'));
+        } else if (clientInactivityTimedOut) {
+          safeSetError(t('visitPrep.generationStalled'));
+        }
+        // Other aborts (navigation, newer run): no error surface.
+      } else if (e instanceof Error) {
+        if (e.message === 'timeout') {
+          safeSetError(t('visitPrep.authTimeout'));
+        } else {
+          safeSetError(e.message);
+        }
+      } else {
+        safeSetError('Failed to generate summary.');
+        safeSetSubscriptionBlocked(false);
+      }
     } finally {
-      setIsLoading(false);
+      clearTimeout(timeoutId);
+      if (inactivityId) clearTimeout(inactivityId);
+      // Only the latest generation may update UI; older runs' finally must not clobber stage/loading.
+      if (generation === generateGenerationRef.current) {
+        const stage = debugStageRef.current;
+        const finished = stage ? `${stage} (finished)` : 'finished';
+        debugStageRef.current = finished;
+        setGenUi({ loading: false, stage: finished });
+      }
     }
   }
 
   return {
     summary,
+    summaryId,
     generatedAt,
     isLoading,
     error,
+    subscriptionBlocked,
     persistError,
     generate,
     history: historyQuery.data ?? [],

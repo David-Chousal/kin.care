@@ -3,6 +3,9 @@ import { initReactI18next } from 'react-i18next';
 import { APP_LOCALES } from './appLocales';
 import { resources } from './resources';
 
+const shouldWarnMissingI18nKeys =
+  process.env.NODE_ENV !== 'production' && (typeof __DEV__ === 'undefined' || __DEV__);
+
 void i18n.use(initReactI18next).init({
   resources,
   lng: 'en',
@@ -14,7 +17,7 @@ void i18n.use(initReactI18next).init({
   returnNull: false,
   returnEmptyString: false,
   parseMissingKeyHandler: (key) => {
-    if (__DEV__) {
+    if (shouldWarnMissingI18nKeys) {
       // eslint-disable-next-line no-console
       console.warn(`[i18n] missing key: ${key}`);
     }

@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme, type Theme } from '../../theme';
 import { useFamilyStore } from '../../store/family';
 import { useAuthStore } from '../../store/auth';
@@ -16,6 +17,7 @@ function SectionHeader({ title }: { title: string }) {
 export function DataPrivacyScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const family = useFamilyStore((s) => s.family);
   const user = useAuthStore((s) => s.user);
   const { data: members = [] } = useMembers(family?.id ?? '');
@@ -28,21 +30,21 @@ export function DataPrivacyScreen() {
 
   function confirmClearVisitPrep() {
     if (!isFamilyAdmin) {
-      Alert.alert('Admins only', 'Only a family admin can clear all Visit Prep history for everyone in this family.');
+      Alert.alert(tx('settings.dataPrivacy.alerts.adminsOnly.title'), tx('settings.dataPrivacy.alerts.adminsOnly.visitPrepBody'));
       return;
     }
     Alert.alert(
-      'Clear all Visit Prep history?',
-      'This removes every saved AI visit summary for this family. It cannot be undone.',
+      tx('settings.dataPrivacy.alerts.confirmClearVisitPrep.title'),
+      tx('settings.dataPrivacy.alerts.confirmClearVisitPrep.body'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tx('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear all',
+          text: tx('common.clearAll'),
           style: 'destructive',
           onPress: () => {
             clearVisitPrep.mutate(undefined, {
-              onSuccess: () => Alert.alert('Done', 'All Visit Prep summaries were removed.'),
-              onError: (e) => Alert.alert('Could not clear', errorMessageFromUnknown(e)),
+              onSuccess: () => Alert.alert(tx('common.done'), tx('settings.dataPrivacy.alerts.clearedVisitPrep')),
+              onError: (e) => Alert.alert(tx('settings.dataPrivacy.alerts.couldNotClear'), errorMessageFromUnknown(e)),
             });
           },
         },
@@ -52,21 +54,21 @@ export function DataPrivacyScreen() {
 
   function confirmClearHealthLogs() {
     if (!isFamilyAdmin) {
-      Alert.alert('Admins only', 'Only a family admin can clear all health log entries for everyone in this family.');
+      Alert.alert(tx('settings.dataPrivacy.alerts.adminsOnly.title'), tx('settings.dataPrivacy.alerts.adminsOnly.healthBody'));
       return;
     }
     Alert.alert(
-      'Clear all health logs?',
-      'This removes every health log entry for this family. It cannot be undone.',
+      tx('settings.dataPrivacy.alerts.confirmClearHealthLogs.title'),
+      tx('settings.dataPrivacy.alerts.confirmClearHealthLogs.body'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tx('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear all',
+          text: tx('common.clearAll'),
           style: 'destructive',
           onPress: () => {
             clearHealthLogs.mutate(undefined, {
-              onSuccess: () => Alert.alert('Done', 'All health log entries were removed.'),
-              onError: (e) => Alert.alert('Could not clear', errorMessageFromUnknown(e)),
+              onSuccess: () => Alert.alert(tx('common.done'), tx('settings.dataPrivacy.alerts.clearedHealthLogs')),
+              onError: (e) => Alert.alert(tx('settings.dataPrivacy.alerts.couldNotClear'), errorMessageFromUnknown(e)),
             });
           },
         },
@@ -82,20 +84,17 @@ export function DataPrivacyScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.intro, { color: t.textSecondary }]}>
-          Bulk actions below apply to the whole family and are permanent. They are limited to family admins so
-          members cannot wipe shared medical history by mistake.
-        </Text>
+        <Text style={[styles.intro, { color: t.textSecondary }]}>{tx('settings.dataPrivacy.intro')}</Text>
 
         {!isFamilyAdmin ? (
           <View style={[styles.notice, { backgroundColor: t.surface, borderColor: t.borderLight }]}>
             <Text style={[styles.noticeText, { color: t.textSecondary }]}>
-              You are not a family admin. Ask an admin if you need all Visit Prep or health logs cleared.
+              {tx('settings.dataPrivacy.notAdminNotice')}
             </Text>
           </View>
         ) : null}
 
-        <SectionHeader title="Clear family data" />
+        <SectionHeader title={tx('settings.dataPrivacy.sectionHeader')} />
         <View style={styles.card}>
           <TouchableOpacity
             style={styles.row}
@@ -104,8 +103,8 @@ export function DataPrivacyScreen() {
             activeOpacity={0.6}
           >
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={[styles.rowLabel, { color: t.error }]}>Clear all Visit Prep history</Text>
-              <Text style={styles.rowSublabel}>Removes every saved AI summary for this family (admins only).</Text>
+              <Text style={[styles.rowLabel, { color: t.error }]}>{tx('settings.dataPrivacy.rows.clearVisitPrep.label')}</Text>
+              <Text style={styles.rowSublabel}>{tx('settings.dataPrivacy.rows.clearVisitPrep.sublabel')}</Text>
             </View>
             {clearVisitPrep.isPending ? <ActivityIndicator color={t.accent} /> : <Text style={styles.rowChevron}>›</Text>}
           </TouchableOpacity>
@@ -117,8 +116,8 @@ export function DataPrivacyScreen() {
             activeOpacity={0.6}
           >
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={[styles.rowLabel, { color: t.error }]}>Clear all health logs</Text>
-              <Text style={styles.rowSublabel}>Removes every health log entry for this family (admins only).</Text>
+              <Text style={[styles.rowLabel, { color: t.error }]}>{tx('settings.dataPrivacy.rows.clearHealthLogs.label')}</Text>
+              <Text style={styles.rowSublabel}>{tx('settings.dataPrivacy.rows.clearHealthLogs.sublabel')}</Text>
             </View>
             {clearHealthLogs.isPending ? <ActivityIndicator color={t.accent} /> : <Text style={styles.rowChevron}>›</Text>}
           </TouchableOpacity>

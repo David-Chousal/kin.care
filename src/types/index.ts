@@ -4,6 +4,7 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string | null;
+  /** Storage path in bucket `profile-avatars` (`{user_id}/filename`); resolve with `getPublicUrl`. */
   avatar_url: string | null;
   created_at: string;
 }
@@ -47,6 +48,7 @@ export interface Invitation {
   role: UserRole;
   token: string;
   accepted: boolean;
+  expires_at: string;
   created_at: string;
 }
 

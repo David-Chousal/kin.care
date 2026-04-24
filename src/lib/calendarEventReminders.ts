@@ -3,9 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import type { CalendarEvent } from '../types';
 import { useNotificationPrefs } from '../store/notifications';
+import {
+  ensureAndroidNotificationChannels,
+  ANDROID_REMINDERS_CHANNEL_ID,
+} from '../features/notifications/ensureAndroidNotificationChannels';
 
 const STORAGE_KEY = 'kin:scheduled_notifications:v1';
-const ANDROID_CHANNEL_ID = 'reminders';
 
 type ScheduledMap = Record<string, string>;
 
@@ -14,20 +17,13 @@ function mapKeyForEvent(eventId: string) {
 }
 
 async function ensureAndroidChannel() {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: 'Reminders',
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'default',
-    vibrationPattern: [0, 250, 250, 250],
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-  });
+  await ensureAndroidNotificationChannels();
 }
 
 async function canScheduleNow() {
   if (Platform.OS === 'web') return false;
   const { status } = await Notifications.getPermissionsAsync();
-  return status === 'granted';
+  return status === 'granted' || (status as string) === 'provisional';
 }
 
 function hasExplicitTime(startsAtIso: string) {
@@ -80,6 +76,12 @@ async function deleteMapping(key: string) {
   await writeMap(map);
 }
 
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+}
+
 export async function cancelCalendarEventReminder(eventId: string) {
   const key = mapKeyForEvent(eventId);
   const map = await readMap();
@@ -114,6 +116,9 @@ export async function scheduleCalendarEventReminder(event: CalendarEvent) {
       body: event.location ? `Today • ${event.location}` : 'Today',
       sound: 'default',
       data: { type: 'calendar_event', eventId: event.id },
+      ...(Platform.OS === 'android'
+        ? { android: { channelId: ANDROID_REMINDERS_CHANNEL_ID } }
+        : {}),
     },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
   });
@@ -121,17 +126,21 @@ export async function scheduleCalendarEventReminder(event: CalendarEvent) {
   await upsertMapping(mapKeyForEvent(event.id), notificationId);
 }
 
-export async function syncCalendarEventReminders(events: CalendarEvent[]) {
+export async function syncCalendarEventReminders(events: CalendarEvent[], signal?: AbortSignal) {
   const prefs = useNotificationPrefs.getState();
 
+  throwIfAborted(signal);
   if (!(await canScheduleNow())) return;
 
+  throwIfAborted(signal);
   const map = await readMap();
+  throwIfAborted(signal);
   const desiredKeys = new Set(events.map((e) => mapKeyForEvent(e.id)));
 
   // If disabled, cancel everything calendar-related and return.
   if (!prefs.masterEnabled || !prefs.eventReminders) {
     const keys = Object.keys(map).filter((k) => k.startsWith('calendar_event:'));
+    throwIfAborted(signal);
     await Promise.all(keys.map(async (k) => {
       const id = map[k];
       if (!id) return;
@@ -141,12 +150,14 @@ export async function syncCalendarEventReminders(events: CalendarEvent[]) {
         delete map[k];
       }
     }));
+    throwIfAborted(signal);
     await writeMap(map);
     return;
   }
 
   // Cancel reminders that no longer correspond to an event.
   const orphanKeys = Object.keys(map).filter((k) => k.startsWith('calendar_event:') && !desiredKeys.has(k));
+  throwIfAborted(signal);
   await Promise.all(orphanKeys.map(async (k) => {
     const id = map[k];
     if (!id) return;
@@ -156,10 +167,14 @@ export async function syncCalendarEventReminders(events: CalendarEvent[]) {
       delete map[k];
     }
   }));
-  if (orphanKeys.length > 0) await writeMap(map);
+  if (orphanKeys.length > 0) {
+    throwIfAborted(signal);
+    await writeMap(map);
+  }
 
   // Ensure all upcoming events have a correct reminder.
   for (const e of events) {
+    throwIfAborted(signal);
     // eslint-disable-next-line no-await-in-loop
     await scheduleCalendarEventReminder(e);
   }

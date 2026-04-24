@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
@@ -23,6 +24,7 @@ export function CreateFamilyScreen({ footerAction }: Props) {
   const styles = makeStyles(t);
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
   const [familyName, setFamilyName] = useState('');
@@ -68,7 +70,9 @@ export function CreateFamilyScreen({ footerAction }: Props) {
       return;
     }
 
-    setFamily(familyData as Family);
+    const nextFamily = familyData as Family;
+    setFamily(nextFamily);
+    queryClient.setQueryData(['family', user.id], nextFamily);
     setLoading(false);
   }
 

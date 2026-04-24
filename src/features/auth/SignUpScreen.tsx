@@ -1,34 +1,56 @@
-import { useState } from 'react';
+import { useMemo, useState, useLayoutEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as Linking from 'expo-linking';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useTheme, elevation, spacing, space, radius, typography, type Theme } from '../../theme';
+import { space, useTheme } from '../../theme';
 import type { AuthStackParamList } from '../../navigation/types';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../../config/legal';
+import { AuthHeroLayout } from './AuthHeroLayout';
+import { AuthPasswordField } from './AuthPasswordField';
+import { makeAuthStyles, authPlaceholderColor } from './authStyles';
 
 export function SignUpScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const t = useTheme();
   const { t: tx } = useTranslation();
-  const styles = makeStyles(t);
+  const t = useTheme();
+  const styles = useMemo(() => makeAuthStyles(t, { compact: true }), [t]);
+  const placeholder = useMemo(() => authPlaceholderColor(t), [t]);
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<1 | 2>(1);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: step === 1 ? tx('auth.signUp.headerTitle') : tx('auth.signUp.inviteTitle'),
+    });
+  }, [navigation, step, tx]);
+
   function goStep2() {
     setError('');
+    if (!legalAccepted) {
+      setError(tx('auth.signUp.errors.legalRequired'));
+      return;
+    }
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError(tx('auth.signUp.errors.allFields'));
       return;
@@ -43,7 +65,7 @@ export function SignUpScreen() {
   async function handleSignUp() {
     setError('');
     setLoading(true);
-    const redirectTo = Linking.createURL('/');
+    const redirectTo = Linking.createURL('auth/callback');
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -74,18 +96,40 @@ export function SignUpScreen() {
   }
 
   if (success) {
+    const before = tx('auth.signUp.successBeforeEmail');
+    const after = tx('auth.signUp.successAfterEmail');
+
     return (
-      <View style={[styles.outer, styles.successContainer, { paddingTop: insets.top + space[6] + space[2] }]}>
-        <View style={styles.successCard}>
-          <MaterialCommunityIcons name="email-check-outline" size={48} color={t.accent} />
-          <Text style={styles.successTitle}>{tx('auth.signUp.successTitle')}</Text>
-          <Text style={styles.successDesc}>
-            {tx('auth.signUp.successDesc', { email })}
-          </Text>
-          <TouchableOpacity style={styles.button} onPress={() => navigation.replace('SignIn')}>
-            <Text style={styles.buttonText}>{tx('auth.signUp.goSignIn')}</Text>
-          </TouchableOpacity>
+      <View
+        style={[
+          styles.successOuter,
+          {
+            paddingTop: insets.top + space[4],
+            paddingBottom: insets.bottom + space[5],
+            paddingHorizontal: space[5],
+          },
+        ]}
+      >
+        <View style={styles.successIconWrap}>
+          <MaterialCommunityIcons name="email-check-outline" size={30} color="#7B8FF7" />
         </View>
+        <Text style={styles.successTitle}>{tx('auth.signUp.successTitle')}</Text>
+        <View style={styles.successDescBlock} accessibilityRole="text">
+          {before !== '' ? <Text style={styles.successDescBody}>{before}</Text> : null}
+          <Text style={styles.successEmailMark} selectable>
+            {email}
+          </Text>
+          <Text style={styles.successDescBody}>{after}</Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.primaryButton, styles.successPrimaryButton, { marginBottom: 0 }]}
+          onPress={() => navigation.replace('SignIn')}
+          accessibilityRole="button"
+          accessibilityLabel={tx('auth.signUp.goSignIn')}
+          accessibilityHint={tx('auth.signUp.a11y.goSignInHint')}
+        >
+          <Text style={styles.primaryButtonText}>{tx('auth.signUp.goSignIn')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -94,153 +138,156 @@ export function SignUpScreen() {
     <KeyboardAvoidingView
       style={styles.outer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingTop: insets.top + space[6] + space[2], paddingBottom: insets.bottom + space[5] }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.brand}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>K</Text>
-          </View>
-          <Text style={styles.appName}>{tx('auth.brand.name')}</Text>
-          <Text style={styles.tagline}>{tx('auth.brand.tagline')}</Text>
-        </View>
+      <AuthHeroLayout heroHeightFraction={0.31}>
+        {step === 1 ? (
+          <>
+            <Text style={styles.stepHint}>{tx('auth.signUp.step1of2')}</Text>
 
-        <View style={styles.form}>
-          {step === 1 ? (
-            <>
-              <Text style={styles.formTitle}>{tx('auth.signUp.createTitle')}</Text>
-              <Text style={styles.stepHint}>{tx('auth.signUp.step1of2')}</Text>
+            <TouchableOpacity
+              style={styles.checkRow}
+              onPress={() => setLegalAccepted((v) => !v)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: legalAccepted }}
+              accessibilityLabel={tx('auth.signUp.a11y.legalCheckbox')}
+            >
+              <View style={[styles.checkBox, legalAccepted && styles.checkBoxOn]}>
+                {legalAccepted ? <Ionicons name="checkmark" size={16} color={t.surface} /> : null}
+              </View>
+              <Text style={styles.checkLabel}>
+                {tx('auth.welcome.legalPrefix')}
+                <Text
+                  style={styles.link}
+                  onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)}
+                  accessibilityRole="link"
+                >
+                  {tx('auth.welcome.termsLink')}
+                </Text>
+                {tx('auth.welcome.legalMid')}
+                <Text
+                  style={styles.link}
+                  onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+                  accessibilityRole="link"
+                >
+                  {tx('auth.welcome.privacyLink')}
+                </Text>
+                {tx('auth.welcome.legalSuffix')}
+              </Text>
+            </TouchableOpacity>
 
-              <Text style={styles.label}>{tx('auth.signUp.fullName')}</Text>
+            <Text style={styles.label}>{tx('auth.signUp.fullName')}</Text>
+            <View style={styles.inputShell}>
               <TextInput
-                style={styles.input}
+                style={styles.inputInShell}
                 placeholder={tx('auth.signUp.namePlaceholder')}
-                placeholderTextColor={t.textTertiary}
+                placeholderTextColor={placeholder}
                 value={fullName}
                 onChangeText={setFullName}
                 returnKeyType="next"
+                accessibilityLabel={tx('auth.signUp.fullName')}
               />
+            </View>
 
-              <Text style={styles.label}>{tx('auth.signUp.email')}</Text>
+            <Text style={styles.label}>{tx('auth.signUp.email')}</Text>
+            <View style={styles.inputShell}>
               <TextInput
-                style={styles.input}
+                style={styles.inputInShell}
                 placeholder={tx('auth.signIn.emailPlaceholder')}
-                placeholderTextColor={t.textTertiary}
+                placeholderTextColor={placeholder}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 returnKeyType="next"
                 value={email}
                 onChangeText={setEmail}
+                accessibilityLabel={tx('auth.signUp.email')}
               />
+            </View>
 
-              <Text style={styles.label}>{tx('auth.signUp.password')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={tx('auth.signUp.passwordHint')}
-                placeholderTextColor={t.textTertiary}
-                secureTextEntry
-                returnKeyType="done"
-                onSubmitEditing={goStep2}
-                value={password}
-                onChangeText={setPassword}
-              />
+            <Text style={styles.label}>{tx('auth.signUp.password')}</Text>
+            <AuthPasswordField
+              value={password}
+              onChangeText={setPassword}
+              placeholder={tx('auth.signUp.passwordHint')}
+              placeholderColor={placeholder}
+              styles={styles}
+              accessibilityLabel={tx('auth.signUp.password')}
+              returnKeyType="done"
+              onSubmitEditing={goStep2}
+            />
 
-              {error !== '' && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
+            {error !== '' && (
+              <View style={styles.errorBox} accessibilityRole="alert">
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={goStep2}
+              accessibilityRole="button"
+              accessibilityLabel={tx('auth.signUp.continue')}
+              accessibilityHint={tx('auth.signUp.a11y.continueHint')}
+            >
+              <Text style={styles.primaryButtonText}>{tx('auth.signUp.continue')}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.stepHint}>{tx('auth.signUp.step2of2')}</Text>
+            <Text style={styles.inviteBody}>{tx('auth.signUp.inviteBody')}</Text>
+
+            {error !== '' && (
+              <View style={styles.errorBox} accessibilityRole="alert">
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => void handleSignUp()}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={tx('auth.signUp.createAccount')}
+              accessibilityHint={tx('auth.signUp.a11y.createAccountHint')}
+              accessibilityState={{ disabled: loading }}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>{tx('auth.signUp.createAccount')}</Text>
               )}
+            </TouchableOpacity>
 
-              <TouchableOpacity style={styles.button} onPress={goStep2}>
-                <Text style={styles.buttonText}>{tx('auth.signUp.continue')}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.formTitle}>{tx('auth.signUp.inviteTitle')}</Text>
-              <Text style={styles.stepHint}>{tx('auth.signUp.step2of2')}</Text>
-              <Text style={styles.inviteBody}>
-                {tx('auth.signUp.inviteBody')}
-              </Text>
+            <TouchableOpacity
+              style={styles.secondaryGhost}
+              onPress={() => {
+                setError('');
+                setStep(1);
+              }}
+              disabled={loading}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={tx('auth.signUp.editDetails')}
+              accessibilityHint={tx('auth.signUp.a11y.editDetailsHint')}
+            >
+              <Text style={styles.secondaryGhostText}>{tx('auth.signUp.editDetails')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
-              {error !== '' && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
-
-              <TouchableOpacity style={styles.button} onPress={handleSignUp} disabled={loading}>
-                {loading ? <ActivityIndicator color={t.surface} /> : <Text style={styles.buttonText}>{tx('auth.signUp.createAccount')}</Text>}
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.secondaryGhost} onPress={() => { setError(''); setStep(1); }} disabled={loading}>
-                <Text style={styles.secondaryGhostText}>{tx('auth.signUp.editDetails')}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          <TouchableOpacity style={styles.toggleBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.toggleText}>{tx('auth.signUp.hasAccount')}</Text>
-            <Text style={styles.toggleLink}>{tx('auth.signUp.signInLink')}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        <TouchableOpacity
+          style={styles.toggleBtn}
+          onPress={() => navigation.navigate('SignIn')}
+          accessibilityRole="button"
+          accessibilityLabel={`${tx('auth.signUp.hasAccount')}${tx('auth.signUp.signInLink')}`}
+          accessibilityHint={tx('auth.signUp.a11y.signInLinkHint')}
+          hitSlop={12}
+        >
+          <Text style={styles.toggleText}>{tx('auth.signUp.hasAccount')}</Text>
+          <Text style={styles.toggleLink}>{tx('auth.signUp.signInLink')}</Text>
+        </TouchableOpacity>
+      </AuthHeroLayout>
     </KeyboardAvoidingView>
   );
-}
-
-function makeStyles(t: Theme) {
-  return StyleSheet.create({
-    outer: { flex: 1, backgroundColor: t.bg },
-    container: { flexGrow: 1, paddingHorizontal: space[5] },
-    successContainer: { paddingHorizontal: space[5], alignItems: 'stretch' },
-    successCard: {
-      backgroundColor: t.surface, borderRadius: radius.xxl, padding: space[6] - space[1],
-      alignItems: 'center', gap: space[3],
-      ...elevation(2, t.shadow),
-    },
-    successTitle: { ...typography.title, color: t.text },
-    successDesc: { ...typography.callout, color: t.textSecondary, textAlign: 'center' },
-    brand: { alignItems: 'center', marginBottom: space[6] + space[2], gap: space[2] },
-    logoCircle: {
-      width: 72, height: 72, borderRadius: 22,
-      backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center',
-      ...elevation(3, t.accent),
-    },
-    logoText: { fontSize: 36, fontWeight: '800', color: t.surface },
-    appName: { ...typography.display, color: t.text },
-    tagline: { ...typography.body, color: t.textSecondary },
-    form: {
-      backgroundColor: t.surface, borderRadius: radius.xxl, padding: space[5],
-      ...elevation(2, t.shadow),
-    },
-    formTitle: { ...typography.heading, fontSize: 20, lineHeight: 24, letterSpacing: -0.2, color: t.text, marginBottom: space[1] },
-    stepHint: { ...typography.caption, color: t.textTertiary, marginBottom: spacing.xl },
-    inviteBody: { ...typography.body, color: t.textSecondary, marginBottom: space[4] },
-    secondaryGhost: {
-      alignSelf: 'center',
-      paddingVertical: spacing.md,
-      marginTop: spacing.xs,
-    },
-    secondaryGhostText: { ...typography.callout, color: t.accent, fontWeight: '600' },
-    label: { ...typography.caption, fontWeight: '600', color: t.textSecondary, marginBottom: space[2] },
-    input: {
-      borderWidth: 1, borderColor: t.border, borderRadius: radius.lg,
-      paddingHorizontal: space[4], paddingVertical: space[3], ...typography.body,
-      color: t.text, backgroundColor: t.bg, marginBottom: space[3] + space[1],
-    },
-    errorBox: { backgroundColor: t.errorSurface, borderRadius: radius.md, padding: space[3], marginBottom: space[3] + space[1] },
-    errorText: { ...typography.caption, color: t.error },
-    button: {
-      backgroundColor: t.accent, borderRadius: radius.xl, paddingVertical: space[4],
-      alignItems: 'center', marginTop: space[1], marginBottom: space[4],
-      ...elevation(4, t.accent),
-    },
-    buttonText: { ...typography.subhead, color: t.surface, fontWeight: '700' },
-    toggleBtn: { flexDirection: 'row', justifyContent: 'center' },
-    toggleText: { ...typography.callout, color: t.textSecondary },
-    toggleLink: { ...typography.callout, color: t.accent, fontWeight: '600' },
-  });
 }

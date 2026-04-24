@@ -16,6 +16,9 @@ jest.mock('react-native', () => ({
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
+  setNotificationChannelAsync: jest.fn(() => Promise.resolve()),
+  AndroidImportance: { DEFAULT: 3 },
+  AndroidNotificationVisibility: { PUBLIC: 1 },
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({

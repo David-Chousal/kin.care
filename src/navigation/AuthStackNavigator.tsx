@@ -1,77 +1,94 @@
-import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { WelcomeIntro } from '../features/auth/WelcomeIntro';
+import { useTranslation } from 'react-i18next';
+import { WelcomeHubScreen } from '../features/auth/WelcomeHubScreen';
 import { SignInScreen } from '../features/auth/SignInScreen';
 import { SignUpScreen } from '../features/auth/SignUpScreen';
-import { useTheme } from '../theme';
+import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
+import { JoinFamilyInfoScreen } from '../features/auth/JoinFamilyInfoScreen';
+import { useRerenderOnI18nLanguageChange } from '../i18n/useRerenderOnI18nLanguageChange';
 import { useReduceMotion } from './useReduceMotion';
 import type { AuthStackParamList } from './types';
+import { useTheme } from '../theme';
 
-const INTRO_KEY = 'kin_welcome_intro_seen';
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-function WelcomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const finishIntro = useCallback(async () => {
-    await AsyncStorage.setItem(INTRO_KEY, '1');
-    navigation.replace('SignIn');
-  }, [navigation]);
-  return <WelcomeIntro onComplete={finishIntro} />;
+function AuthHeaderBackButton() {
+  const navigation = useNavigation();
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={() => navigation.goBack()}
+      hitSlop={12}
+      style={{ paddingRight: 8, paddingVertical: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+    >
+      <Ionicons name="chevron-back" size={24} color={t.text} />
+    </Pressable>
+  );
 }
 
 export function AuthStackNavigator() {
-  const t = useTheme();
+  useRerenderOnI18nLanguageChange();
   const reduceMotion = useReduceMotion();
-  const [introReady, setIntroReady] = useState(false);
-  const [introSeen, setIntroSeen] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const v = await AsyncStorage.getItem(INTRO_KEY);
-        if (!cancelled) setIntroSeen(v === '1');
-      } finally {
-        if (!cancelled) setIntroReady(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!introReady) {
-    return (
-      <View style={[styles.boot, { backgroundColor: t.bg }]}>
-        <ActivityIndicator size="large" color={t.accent} />
-      </View>
-    );
-  }
+  const t = useTheme();
+  const { t: tx } = useTranslation();
 
   return (
     <Stack.Navigator
-      initialRouteName={introSeen ? 'SignIn' : 'Welcome'}
+      initialRouteName="WelcomeHub"
       screenOptions={{
-        headerShown: false,
         animation: reduceMotion ? 'fade' : 'default',
         contentStyle: { backgroundColor: t.bg },
+        headerShown: true,
+        headerStyle: { backgroundColor: t.bg },
+        headerTintColor: t.text,
+        headerTitleStyle: { color: t.text, fontWeight: '700' },
+        headerBackTitleVisible: false,
+        headerShadowVisible: false,
+        headerLeft: (props) => (props.canGoBack ? <AuthHeaderBackButton /> : null),
       }}
     >
       <Stack.Screen
-        name="Welcome"
-        component={WelcomeScreen}
-        options={{ animation: 'fade' }}
+        name="WelcomeHub"
+        component={WelcomeHubScreen}
+        options={{
+          title: '',
+          animation: 'fade',
+        }}
       />
-      <Stack.Screen name="SignIn" component={SignInScreen} />
-      <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen
+        name="SignIn"
+        component={SignInScreen}
+        options={() => ({
+          title: tx('auth.signIn.headerTitle'),
+        })}
+      />
+      <Stack.Screen
+        name="SignUp"
+        component={SignUpScreen}
+        options={() => ({
+          title: tx('auth.signUp.headerTitle'),
+        })}
+      />
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={() => ({
+          title: tx('auth.forgotPassword.headerTitle'),
+        })}
+      />
+      <Stack.Screen
+        name="JoinFamilyInfo"
+        component={JoinFamilyInfoScreen}
+        options={() => ({
+          title: tx('auth.joinFamily.headerTitle'),
+        })}
+      />
     </Stack.Navigator>
   );
 }
 
-const styles = StyleSheet.create({
-  boot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-});

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
+  Alert,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuthStore } from '../../store/auth';
@@ -125,6 +126,10 @@ export function UploadDocumentSheet({ visible, onClose }: Props) {
       setFormError('Please enter a document name.');
       return;
     }
+    if (!user?.id) {
+      Alert.alert('Session expired', 'Please sign in again to upload a document.');
+      return;
+    }
 
     try {
       await upload.mutateAsync({
@@ -133,7 +138,7 @@ export function UploadDocumentSheet({ visible, onClose }: Props) {
         fileType: pickedFile.mimeType,
         fileSize: pickedFile.size,
         category,
-        uploaded_by: user!.id,
+        uploaded_by: user.id,
       });
       reset();
       onClose();

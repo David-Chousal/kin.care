@@ -11,6 +11,8 @@ import {
   weeklyFrequencyLabel,
   sortedUniqueDays,
   minutesFromTimeStrings,
+  medicationStructuredScheduleFields,
+  appWeekdayToExpoWeekday,
 } from '../scheduleUtils';
 
 describe('pad2', () => {
@@ -119,5 +121,39 @@ describe('minutesFromTimeStrings', () => {
   });
   it('parses valid list', () => {
     expect(minutesFromTimeStrings(['08:00', '20:00'])).toEqual([8 * 60, 20 * 60]);
+  });
+});
+
+describe('appWeekdayToExpoWeekday', () => {
+  it('maps Sunday through Saturday to Expo 1–7', () => {
+    expect(appWeekdayToExpoWeekday(0)).toBe(1);
+    expect(appWeekdayToExpoWeekday(6)).toBe(7);
+  });
+});
+
+describe('medicationStructuredScheduleFields', () => {
+  it('maps as_needed', () => {
+    expect(medicationStructuredScheduleFields('as_needed', [480], [])).toEqual({
+      frequency_type: 'as_needed',
+      times: null,
+      times_per_day: null,
+      days_of_week: null,
+    });
+  });
+  it('maps daily with sorted times', () => {
+    expect(medicationStructuredScheduleFields('daily', [20 * 60, 8 * 60], [])).toEqual({
+      frequency_type: 'daily',
+      times: ['08:00', '20:00'],
+      times_per_day: 2,
+      days_of_week: null,
+    });
+  });
+  it('maps weekly with days', () => {
+    expect(medicationStructuredScheduleFields('weekly', [9 * 60], [3, 1])).toEqual({
+      frequency_type: 'weekly',
+      times: ['09:00'],
+      times_per_day: 1,
+      days_of_week: [1, 3],
+    });
   });
 });

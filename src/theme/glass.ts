@@ -7,6 +7,13 @@ import type { Theme } from './index';
  */
 export const GLASS_HEADER_FORCE_FALLBACK = false;
 
+/**
+ * expo-blur on Android uses `RenderEffectBlur` only from API 31; below that
+ * `RenderScriptBlur` often degrades to an opaque gray slab with poor contrast
+ * against header labels. Prefer opaque `t.surface` chrome instead.
+ */
+export const GLASS_ANDROID_MIN_API_FOR_LIVE_BLUR = 31;
+
 /** Unified frosted chrome blur strength (headers, footer, floating fallback). */
 export const GLASS_BLUR_INTENSITY = {
   ios: 80,
@@ -39,12 +46,10 @@ export function frostSolidFallbackColor(t: Theme): string {
 }
 
 /**
- * Semi-opaque “glass” approximation when blur is off (a11y, web, or forced fallback).
- * Uses hex + alpha suffix; falls back to opaque surface if `t.surface` is not #RRGGBB.
+ * Opaque header/sheet chrome when live blur is off (reduce motion/transparency,
+ * web, older Android blur, high text contrast, or forced fallback). Uses
+ * `t.surface` so titles and controls keep the same contrast as the rest of the app.
  */
-export function frostGlassFallbackFill(t: Theme, scheme: 'light' | 'dark'): string {
-  const hex = t.surface.replace('#', '');
-  if (hex.length !== 6) return t.surface;
-  const alpha = scheme === 'dark' ? 'E6' : 'EE';
-  return `#${hex}${alpha}`;
+export function frostGlassFallbackFill(t: Theme, _scheme: 'light' | 'dark'): string {
+  return t.surface;
 }

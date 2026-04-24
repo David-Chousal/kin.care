@@ -1,32 +1,29 @@
-import { useState, useRef, useCallback, useLayoutEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Animated, Alert } from 'react-native';
+import { useState, useRef, useCallback, useLayoutEffect, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { hapticImpact, ImpactFeedbackStyle } from '../../lib/haptics';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
 import { showActionSheet } from '../../lib/actionSheet';
 import { useFamilyStore } from '../../store/family';
 import { useAuthStore } from '../../store/auth';
 import { Toast } from '../../components/Toast';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
 import { Task } from '../../types';
-import { useTasks, useDeleteTask } from './hooks/useTasks';
+import { useTasks, useDeleteTask, useCompleteTask } from './hooks/useTasks';
 import { AddTaskSheet } from './AddTaskSheet';
 import { useTheme, typography, type Theme } from '../../theme';
 import { Icon } from '../../components/Icon';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { EmptyState } from '../../components/EmptyState';
+import { UserAvatar } from '../../components/UserAvatar';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 type AssigneeFilter = 'all' | 'mine' | 'others';
-
-const FILTER_LABELS: Record<AssigneeFilter, string> = {
-  all: 'All',
-  mine: 'Assigned to me',
-  others: 'Assigned to others',
-};
 
 function filterTasks(tasks: Task[], filter: AssigneeFilter, userId: string): Task[] {
   switch (filter) {
@@ -51,19 +48,27 @@ function assigneeInitials(name: string): string {
 function AssigneeChip({ task }: { task: Task }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
 
   if (!task.assigned_to || !task.assigned_profile) {
-    return <Text style={styles.unassignedText}>Unassigned</Text>;
+    return <Text style={styles.unassignedText}>{tx('tasks.board.unassigned')}</Text>;
   }
 
-  const name = task.assigned_profile.full_name ?? task.assigned_profile.email ?? 'Member';
+  const name =
+    task.assigned_profile.full_name ??
+    task.assigned_profile.email ??
+    tx('tasks.board.memberFallback');
   const initials = assigneeInitials(name);
 
   return (
     <View style={styles.assigneeChip}>
-      <View style={styles.assigneeAvatar}>
-        <Text style={styles.assigneeAvatarText}>{initials}</Text>
-      </View>
+      <UserAvatar
+        size={18}
+        avatarStoragePath={task.assigned_profile.avatar_url}
+        initials={initials}
+        backgroundColor={t.accentLight}
+        textColor={t.accent}
+      />
       <Text style={styles.assigneeName} numberOfLines={1}>{name}</Text>
     </View>
   );
@@ -77,16 +82,20 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
 }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const formatLocale = useFormatLocaleTag();
   const swipeableRef = useRef<Swipeable>(null);
   const isOverdue = !task.completed && task.due_date && new Date(task.due_date) < new Date();
-  const taskLabel = task.title?.trim() ? `Task: ${task.title.trim()}` : 'Task';
+  const taskLabel = task.title?.trim()
+    ? tx('tasks.board.a11y.taskLabel', { title: task.title.trim() })
+    : tx('tasks.board.a11y.taskLabelNoTitle');
 
   function renderLeftActions(progress: Animated.AnimatedInterpolation<number>) {
     const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-80, 0] });
     return (
       <Animated.View style={[styles.swipeAction, { backgroundColor: t.success, transform: [{ translateX }] }]}>
         <Icon name="check" size={22} color={t.surface} />
-        <Text style={styles.swipeActionText}>Done</Text>
+        <Text style={styles.swipeActionText}>{tx('tasks.board.swipe.done')}</Text>
       </Animated.View>
     );
   }
@@ -100,16 +109,16 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
           onPress={() => { swipeableRef.current?.close(); onDelete(task); }}
         >
           <Icon name="trash" size={20} color={t.surface} />
-          <Text style={styles.swipeActionText}>Delete</Text>
+          <Text style={styles.swipeActionText}>{tx('common.delete')}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
   }
 
   const accessibilityActions = [
-    ...(!task.completed ? [{ name: 'markdone', label: 'Mark done' }] : []),
-    { name: 'edit', label: 'Edit' },
-    { name: 'delete', label: 'Delete' },
+    ...(!task.completed ? [{ name: 'markdone', label: tx('tasks.board.a11y.actionMarkDone') }] : []),
+    { name: 'edit', label: tx('common.edit') },
+    { name: 'delete', label: tx('common.delete') },
   ];
 
   return (
@@ -131,7 +140,7 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
         style={styles.taskCard}
         accessible
         accessibilityLabel={taskLabel}
-        accessibilityHint="Actions available. Swipe up or down for actions."
+        accessibilityHint={tx('tasks.board.a11y.actionsHint')}
         accessibilityActions={accessibilityActions}
         onAccessibilityAction={(e) => {
           const action = e.nativeEvent.actionName;
@@ -153,7 +162,11 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
           onPress={() => onToggle(task)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={task.completed ? `Mark as not done. ${taskLabel}` : `Mark as done. ${taskLabel}`}
+          accessibilityLabel={
+            task.completed
+              ? tx('tasks.board.a11y.markNotDone', { taskLabel })
+              : tx('tasks.board.a11y.markDone', { taskLabel })
+          }
         >
           {task.completed && <Icon name="check" size={13} color={t.surface} />}
         </TouchableOpacity>
@@ -169,7 +182,12 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
               <View style={styles.dueRow}>
                 {isOverdue && <Icon name="warning" size={12} color={t.error} />}
                 <Text style={[styles.dueDate, isOverdue && styles.dueDateOverdue]}>
-                  Due {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {tx('tasks.board.due', {
+                    date: new Date(task.due_date).toLocaleDateString(formatLocale, {
+                      month: 'short',
+                      day: 'numeric',
+                    }),
+                  })}
                 </Text>
               </View>
             ) : null}
@@ -180,12 +198,16 @@ function SwipeableTaskRow({ task, onToggle, onDelete, onEdit }: {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => {
             showActionSheet(
-              { options: ['Cancel', 'Edit', 'Delete'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+              {
+                options: [tx('common.cancel'), tx('common.edit'), tx('common.delete')],
+                destructiveButtonIndex: 2,
+                cancelButtonIndex: 0,
+              },
               (i) => { if (i === 1) onEdit(task); if (i === 2) onDelete(task); }
             );
           }}
           accessibilityRole="button"
-          accessibilityLabel={`More actions. ${taskLabel}`}
+          accessibilityLabel={tx('tasks.board.a11y.moreActions', { taskLabel })}
         >
           <Text style={styles.menuDots}>···</Text>
         </TouchableOpacity>
@@ -200,7 +222,13 @@ function FilterBar({ selected, onChange }: {
 }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const filters: AssigneeFilter[] = ['all', 'mine', 'others'];
+  const filterLabels: Record<AssigneeFilter, string> = {
+    all: tx('tasks.board.filters.all'),
+    mine: tx('tasks.board.filters.mine'),
+    others: tx('tasks.board.filters.others'),
+  };
   return (
     <View style={styles.filterBar}>
       {filters.map((f) => (
@@ -211,7 +239,7 @@ function FilterBar({ selected, onChange }: {
           activeOpacity={0.7}
         >
           <Text style={[styles.filterChipText, selected === f && styles.filterChipTextActive]}>
-            {FILTER_LABELS[f]}
+            {filterLabels[f]}
           </Text>
         </TouchableOpacity>
       ))}
@@ -223,61 +251,94 @@ export function TaskBoardScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const { t: tx } = useTranslation();
   const family = useFamilyStore((s) => s.family);
   const { user } = useAuthStore();
-  const queryClient = useQueryClient();
   const { data: tasks, isLoading, isFetching, refetch } = useTasks(family?.id ?? null);
   const deleteTask = useDeleteTask(family?.id ?? null);
+  const completeTask = useCompleteTask(family?.id ?? null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
   const [toast, setToast] = useState({ visible: false, message: '' });
+  const undoDelete = useUndoDelete();
   const [filter, setFilter] = useState<AssigneeFilter>('all');
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
   const clearFilter = useCallback(() => setFilter('all'), []);
+
+  useEffect(() => {
+    setShowAllCompleted(false);
+  }, [filter]);
+  const togglingTaskIdsRef = useRef(new Set<string>());
 
   const openAdd = useCallback(() => setSheetVisible(true), []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <NativeHeaderTextButton label="Add" onPress={openAdd} />,
+      headerRight: () => <NativeHeaderTextButton label={tx('common.add')} onPress={openAdd} />,
     });
-  }, [navigation, openAdd]);
+  }, [navigation, openAdd, tx]);
 
   function showToast(message: string) {
     setToast({ visible: true, message });
   }
 
-  async function handleToggle(task: Task) {
+  function handleToggle(task: Task) {
+    if (togglingTaskIdsRef.current.has(task.id)) return;
+
     hapticImpact(ImpactFeedbackStyle.Light);
     const nowCompleted = !task.completed;
-    await supabase
-      .from('tasks')
-      .update({ completed: nowCompleted, completed_at: nowCompleted ? new Date().toISOString() : null })
-      .eq('id', task.id);
-    queryClient.invalidateQueries({ queryKey: ['tasks', family?.id] });
-    if (nowCompleted) showToast('Task completed');
+    togglingTaskIdsRef.current.add(task.id);
+
+    completeTask.mutate(
+      { id: task.id, completed: nowCompleted },
+      {
+        onError: () => showToast(tx('tasks.board.toast.updateFailed')),
+        onSuccess: (_data, vars) => {
+          if (vars.completed) showToast(tx('tasks.board.toast.completed'));
+        },
+        onSettled: () => {
+          togglingTaskIdsRef.current.delete(task.id);
+        },
+      }
+    );
   }
 
   function handleDelete(task: Task) {
-    Alert.alert('Delete Task', `Delete "${task.title}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteTask.mutate(task.id) },
-    ]);
+    const title = task.title?.trim() || 'Task';
+    undoDelete.scheduleDelete(`Removed: ${title}`, () => deleteTask.mutate(task.id));
   }
 
   const allTasks = tasks ?? [];
   const filteredTasks = user ? filterTasks(allTasks, filter, user.id) : allTasks;
   const todo = filteredTasks.filter((t) => !t.completed);
-  const done = filteredTasks.filter((t) => t.completed).slice(0, 5);
+  const completedTasks = filteredTasks.filter((t) => t.completed);
+  const completedTotal = completedTasks.length;
+  const done =
+    showAllCompleted || completedTotal <= 5
+      ? completedTasks
+      : completedTasks.slice(0, 5);
+  const completedHidden = Math.max(0, completedTotal - 5);
   const totalTasks = allTasks.length;
   const firstTimeEmpty = totalTasks === 0;
 
   const listData = [
     { type: 'filters' as const },
-    { type: 'header' as const, label: `TO DO${todo.length > 0 ? ` · ${todo.length}` : ''}` },
+    {
+      type: 'header' as const,
+      label: `${tx('tasks.board.sections.todo')}${todo.length > 0 ? tx('tasks.board.countSuffix', { count: todo.length }) : ''}`,
+    },
     ...todo.map((t) => ({ type: 'task' as const, task: t })),
     ...(todo.length === 0 ? [{ type: 'empty' as const }] : []),
-    ...(done.length > 0 ? [{ type: 'header' as const, label: 'COMPLETED' }] : []),
+    ...(completedTotal > 0
+      ? [{ type: 'header' as const, label: tx('tasks.board.sections.completed', { count: completedTotal }) }]
+      : []),
     ...done.map((t) => ({ type: 'task' as const, task: t })),
+    ...(completedTotal > 5 && !showAllCompleted
+      ? [{ type: 'completedExpand' as const, hiddenCount: completedHidden }]
+      : []),
+    ...(completedTotal > 5 && showAllCompleted
+      ? [{ type: 'completedCollapse' as const }]
+      : []),
   ];
 
   return (
@@ -290,7 +351,11 @@ export function TaskBoardScreen() {
         <FlatList
           style={{ flex: 1 }}
           data={listData}
-          keyExtractor={(item, i) => item.type === 'task' ? item.task!.id : `${item.type}-${i}`}
+          keyExtractor={(item, i) =>
+            item.type === 'task'
+              ? item.task!.id
+              : `${item.type}-${i}`
+          }
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[styles.list, { paddingTop: 8 }, firstTimeEmpty && { flexGrow: 1 }]}
           refreshing={isFetching && !isLoading}
@@ -300,14 +365,52 @@ export function TaskBoardScreen() {
               return <FilterBar selected={filter} onChange={setFilter} />;
             }
             if (item.type === 'header') return <Text style={styles.sectionLabel}>{item.label}</Text>;
+            if (item.type === 'completedExpand') {
+              return (
+                <TouchableOpacity
+                  style={styles.completedToggle}
+                  onPress={() => {
+                    hapticImpact(ImpactFeedbackStyle.Light);
+                    setShowAllCompleted(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={tx('tasks.board.a11y.showAllCompleted', {
+                    completedTotal,
+                    hiddenCount: item.hiddenCount,
+                  })}
+                >
+                  <Text style={styles.completedToggleText}>{tx('tasks.board.completed.showAll')}</Text>
+                  <View style={styles.completedBadge}>
+                    <Text style={styles.completedBadgeText}>{item.hiddenCount}</Text>
+                  </View>
+                  <Icon name="chevron" size={18} color={t.accent} style={{ transform: [{ rotate: '90deg' }] }} />
+                </TouchableOpacity>
+              );
+            }
+            if (item.type === 'completedCollapse') {
+              return (
+                <TouchableOpacity
+                  style={styles.completedToggle}
+                  onPress={() => {
+                    hapticImpact(ImpactFeedbackStyle.Light);
+                    setShowAllCompleted(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={tx('tasks.board.a11y.showFewerCompleted')}
+                >
+                  <Text style={styles.completedToggleText}>{tx('tasks.board.completed.showLess')}</Text>
+                  <Icon name="chevron" size={18} color={t.accent} style={{ transform: [{ rotate: '-90deg' }] }} />
+                </TouchableOpacity>
+              );
+            }
             if (item.type === 'empty') {
               if (filter !== 'all' && totalTasks > 0) {
                 return (
                   <EmptyState
                     icon="checkCircle"
-                    title="No tasks here"
-                    message={filter === 'mine' ? 'No tasks assigned to you.' : 'No tasks assigned to others.'}
-                    actionLabel="Show all tasks"
+                    title={tx('tasks.board.empty.filtered.title')}
+                    message={filter === 'mine' ? tx('tasks.board.empty.filtered.mine') : tx('tasks.board.empty.filtered.others')}
+                    actionLabel={tx('tasks.board.empty.filtered.action')}
                     onAction={clearFilter}
                   />
                 );
@@ -315,18 +418,18 @@ export function TaskBoardScreen() {
               return firstTimeEmpty ? (
                 <EmptyState
                   icon="tasks"
-                  title="No tasks yet"
-                  message="Create tasks for medications, appointments, or anything the team should remember."
-                  actionLabel="Add your first task"
+                  title={tx('tasks.board.empty.first.title')}
+                  message={tx('tasks.board.empty.first.message')}
+                  actionLabel={tx('tasks.board.empty.first.action')}
                   onAction={openAdd}
                 />
               ) : (
                 <EmptyState
                   icon="checkCircle"
                   iconColor={t.success}
-                  title="All caught up"
-                  message="No open tasks right now. Add another when something new comes up."
-                  actionLabel="Add a task"
+                  title={tx('tasks.board.empty.caughtUp.title')}
+                  message={tx('tasks.board.empty.caughtUp.message')}
+                  actionLabel={tx('tasks.board.empty.caughtUp.action')}
                   onAction={openAdd}
                 />
               );
@@ -349,10 +452,16 @@ export function TaskBoardScreen() {
           visible={sheetVisible}
           editing={editingTask}
           onClose={() => { setSheetVisible(false); setEditingTask(undefined); }}
-          onAdded={() => showToast(editingTask ? 'Task updated' : 'Task added')}
+          onAdded={() => showToast(editingTask ? tx('tasks.board.toast.updated') : tx('tasks.board.toast.added'))}
         />
       )}
       <Toast message={toast.message} visible={toast.visible} onHide={() => setToast({ visible: false, message: '' })} />
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
+      />
     </View>
   );
 }
@@ -382,6 +491,27 @@ function makeStyles(t: Theme) {
       fontWeight: '600',
     },
     sectionLabel: { ...typography.overline, color: t.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 8, marginBottom: 8 },
+    completedToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 8,
+      marginTop: 4,
+      marginBottom: 8,
+      paddingVertical: 8,
+      paddingRight: 4,
+    },
+    completedToggleText: { ...typography.subhead, color: t.accent, fontWeight: '600' },
+    completedBadge: {
+      minWidth: 22,
+      height: 22,
+      paddingHorizontal: 6,
+      borderRadius: 11,
+      backgroundColor: t.accentLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    completedBadgeText: { ...typography.caption, fontWeight: '700', color: t.accent, fontVariant: ['tabular-nums'] },
     swipeAction: {
       width: 80, justifyContent: 'center', alignItems: 'center', gap: 4,
       borderRadius: 14, marginBottom: 8,
@@ -412,12 +542,6 @@ function makeStyles(t: Theme) {
     dueDate: { ...typography.footnote, color: t.textSecondary },
     dueDateOverdue: { color: t.error, fontWeight: '600' },
     assigneeChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    assigneeAvatar: {
-      width: 18, height: 18, borderRadius: 9,
-      backgroundColor: t.accentLight,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    assigneeAvatarText: { fontSize: 9, fontWeight: '700', color: t.accent },
     assigneeName: { ...typography.footnote, color: t.textSecondary, maxWidth: 120 },
     unassignedText: { ...typography.footnote, color: t.textTertiary, fontStyle: 'italic' },
     menuDots: { ...typography.heading, color: t.textTertiary, paddingLeft: 8 },

@@ -1,0 +1,26 @@
+# Supabase local / linked project configuration
+# https://supabase.com/docs/guides/functions/function-configuration
+#
+# Auth “Confirm signup” email (local GoTrue). Hosted projects: Dashboard → Authentication →
+# Email Templates → Confirm signup — paste HTML from supabase/templates/confirmation.html (or mirror edits).
+
+[auth.email.template.confirmation]
+subject = "Confirm your Kin account"
+content_path = "./supabase/templates/confirmation.html"
+
+# Password reset (local GoTrue). Hosted: Dashboard → Authentication → Email Templates → Reset password.
+[auth.email.template.recovery]
+subject = "Reset your Kin password"
+content_path = "./supabase/templates/recovery.html"
+
+# Gateway JWT verify can reject valid user JWTs (e.g. ES256). Auth is enforced in-function via getUser().
+[functions.llm-gateway]
+verify_jwt = false
+
+# RevenueCat calls this with a shared Authorization header — not a Supabase JWT.
+[functions.rc-webhook]
+verify_jwt = false
+
+# Gateway JWT verify rejects some session algorithms (e.g. ES256). Auth is enforced in-function via getUser().
+[functions.delete-account]
+verify_jwt = false

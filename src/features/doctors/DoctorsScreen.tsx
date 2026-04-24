@@ -1,11 +1,12 @@
-import { useRef, useState, useCallback, useLayoutEffect, useMemo } from 'react';
+import { useState, useCallback, useLayoutEffect, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList, StyleSheet, Alert, Animated, Linking,
+  View, Text, TouchableOpacity, FlatList, StyleSheet, Linking, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { showActionSheet } from '../../lib/actionSheet';
-import { Swipeable } from 'react-native-gesture-handler';
+import { SwipeToDelete } from '../../components/SwipeToDelete';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { useFamilyDoctors, useDeleteFamilyDoctor } from './hooks/useFamilyDoctors';
 import { useMedications } from '../medications/hooks/useMedications';
@@ -16,10 +17,17 @@ import type { FamilyDoctor } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { EmptyState } from '../../components/EmptyState';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
-function formatAppt(iso: string) {
+function formatAppt(iso: string, locale: string) {
   const d = new Date(iso);
-  return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  const dateStr = d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+  // Same convention as CalendarScreen.formatTime / AddDoctorSheet: local 00:00 means "date only", not midnight.
+  if (d.getHours() === 0 && d.getMinutes() === 0) return dateStr;
+  return `${dateStr} · ${d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function DoctorCard({
@@ -35,6 +43,8 @@ function DoctorCard({
 }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const formatLocale = useFormatLocaleTag();
 
   function dial() {
     if (!item.phone?.trim()) return;
@@ -75,12 +85,12 @@ function DoctorCard({
         {item.next_appointment_at ? (
           <View style={[styles.metaRow, { marginTop: 6 }]}>
             <Icon name="calendar" size={14} color={t.textSecondary} />
-            <Text style={styles.apptText}>{formatAppt(item.next_appointment_at)}</Text>
+            <Text style={styles.apptText}>{formatAppt(item.next_appointment_at, formatLocale)}</Text>
           </View>
         ) : null}
         {medLabels.length > 0 ? (
           <View style={styles.medRow}>
-            <Text style={styles.linkedLabel}>Meds</Text>
+            <Text style={styles.linkedLabel}>{tx('doctors.linkedMedsLabel')}</Text>
             <View style={styles.medLinks}>
               {medLabels.map(({ id, name }) => (
                 <TouchableOpacity
@@ -100,49 +110,15 @@ function DoctorCard({
   );
 }
 
-function SwipeableDoctorCard(props: {
-  item: FamilyDoctor;
-  medLabels: { id: string; name: string }[];
-  onDelete: () => void;
-  onMenu: () => void;
-  onOpenMed: (id: string) => void;
-}) {
-  const t = useTheme();
-  const styles = makeStyles(t);
-  const swipeableRef = useRef<Swipeable>(null);
-  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
-    return (
-      <Animated.View style={[styles.swipeDeleteAction, { transform: [{ translateX }] }]}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => { swipeableRef.current?.close(); props.onDelete(); }}
-        >
-          <Icon name="trash" size={20} color={t.surface} />
-          <Text style={styles.swipeDeleteText}>Delete</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-  return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40}>
-      <DoctorCard
-        item={props.item}
-        medLabels={props.medLabels}
-        onMenu={props.onMenu}
-        onOpenMed={props.onOpenMed}
-      />
-    </Swipeable>
-  );
-}
-
 export function DoctorsScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { data: doctors, isLoading, isFetching, refetch } = useFamilyDoctors();
   const { data: medications = [] } = useMedications();
   const deleteDoctor = useDeleteFamilyDoctor();
+  const undoDelete = useUndoDelete();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<FamilyDoctor | undefined>(undefined);
 
@@ -155,9 +131,9 @@ export function DoctorsScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <NativeHeaderTextButton label="Add" onPress={openAdd} />,
+      headerRight: () => <NativeHeaderTextButton label={tx('common.add')} onPress={openAdd} />,
     });
-  }, [navigation, openAdd]);
+  }, [navigation, openAdd, tx]);
 
   function medLabelsFor(doc: FamilyDoctor): { id: string; name: string }[] {
     return (doc.linked_medication_ids ?? []).flatMap((id) => {
@@ -168,19 +144,45 @@ export function DoctorsScreen() {
 
   function showMenu(doc: FamilyDoctor) {
     showActionSheet(
-      { options: ['Cancel', 'Edit', 'Delete'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+      {
+        options: [tx('common.cancel'), tx('doctors.menu.scheduleVisit'), tx('common.edit'), tx('common.delete')],
+        destructiveButtonIndex: 3,
+        cancelButtonIndex: 0,
+      },
       (i) => {
-        if (i === 1) { setEditing(doc); setShowAdd(true); }
-        if (i === 2) confirmDelete(doc);
+        if (i === 1) {
+          const appt = doc.next_appointment_at?.trim() ? doc.next_appointment_at : undefined;
+          const apptDate = appt ? new Date(appt) : null;
+          const apptHasTime = !!apptDate && (apptDate.getHours() !== 0 || apptDate.getMinutes() !== 0);
+
+          navigation.navigate('Calendar', {
+            openAdd: true,
+            draft: {
+              title: doc.name?.trim()
+                ? tx('doctors.draft.visitTitle', { name: doc.name.trim() })
+                : tx('doctors.draft.fallbackTitle'),
+              location: doc.address?.trim() || undefined,
+              description: doc.specialty?.trim() || undefined,
+              startsAt: appt,
+              includeTime: appt ? apptHasTime : true,
+            },
+          });
+        }
+        if (i === 2) { setEditing(doc); setShowAdd(true); }
+        if (i === 3) confirmDelete(doc);
       },
     );
   }
 
   function confirmDelete(doc: FamilyDoctor) {
-    Alert.alert('Remove Doctor', `Remove ${doc.name} from your list?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteDoctor.mutate(doc.id) },
-    ]);
+    const name = doc.name?.trim() || tx('common.doctor');
+    undoDelete.scheduleDelete(tx('common.removed', { item: name }), () =>
+      deleteDoctor.mutate(doc.id, {
+        onError: (err) => {
+          Alert.alert(tx('doctors.errors.deleteFailedTitle'), errorMessageFromUnknown(err));
+        },
+      }),
+    );
   }
 
   return (
@@ -201,20 +203,24 @@ export function DoctorsScreen() {
           ListEmptyComponent={(
             <EmptyState
               icon="doctor"
-              title="No doctors yet"
-              message="Save names, specialties, contact info, and next visits. Link medications so everyone knows who prescribes what."
-              actionLabel="Add a doctor"
+              title={tx('doctors.empty.title')}
+              message={tx('doctors.empty.message')}
+              actionLabel={tx('doctors.empty.action')}
               onAction={openAdd}
             />
           )}
           renderItem={({ item }) => (
-            <SwipeableDoctorCard
-              item={item}
-              medLabels={medLabelsFor(item)}
+            <SwipeToDelete
               onDelete={() => confirmDelete(item)}
-              onMenu={() => showMenu(item)}
-              onOpenMed={(id) => navigation.navigate('MedicationDetail', { medicationId: id })}
-            />
+              accessibilityLabel={item.name?.trim() || tx('doctors.a11y.doctorFallback')}
+            >
+              <DoctorCard
+                item={item}
+                medLabels={medLabelsFor(item)}
+                onMenu={() => showMenu(item)}
+                onOpenMed={(id) => navigation.navigate('MedicationDetail', { medicationId: id })}
+              />
+            </SwipeToDelete>
           )}
         />
       )}
@@ -223,6 +229,13 @@ export function DoctorsScreen() {
         visible={showAdd}
         editing={editing}
         onClose={() => { setShowAdd(false); setEditing(undefined); }}
+      />
+
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
       />
     </View>
   );
@@ -274,14 +287,5 @@ function makeStyles(t: Theme) {
       maxWidth: '100%',
     },
     medPillText: { fontSize: 12, fontWeight: '600', color: t.accent, maxWidth: 160 },
-    swipeDeleteAction: {
-      width: 80,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: t.error,
-      borderRadius: 14,
-    },
-    swipeDeleteBtn: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', gap: 4 },
-    swipeDeleteText: { color: t.surface, fontWeight: '700', fontSize: 12, textAlign: 'center' },
   });
 }

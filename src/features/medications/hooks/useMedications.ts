@@ -1,22 +1,12 @@
 import { useQuery, useMutation, useQueryClient, type Query } from '@tanstack/react-query';
-import * as Notifications from 'expo-notifications';
 import { supabase } from '../../../lib/supabase';
+import {
+  scheduleMedicationRefillNotification,
+  shouldFireRefillBecameLow,
+} from '../../../lib/medicationRefillNotifications';
 import { useFamilyStore } from '../../../store/family';
-import type { Medication, MedicationLog } from '../../../types';
+import type { Medication, MedicationFrequencyType, MedicationLog } from '../../../types';
 import { inferFrequencyTypeFromLegacyFrequency } from '../scheduleUtils';
-
-async function scheduleRefillAlert(medicationName: string, quantityRemaining: number) {
-  const { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') return;
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Refill reminder',
-      body: `${medicationName} is running low — only ${quantityRemaining} left.`,
-      sound: true,
-    },
-    trigger: null, // fire immediately
-  });
-}
 
 // ─── Schedule helpers ────────────────────────────────────────────────────────
 
@@ -29,6 +19,29 @@ export interface MedSchedule {
 
 export type RawMedLog = { status: string; scheduled_at: string };
 export type MedLogsMap = Record<string, RawMedLog[]>;
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+export function isWeeklyScheduledForDate(med: Medication, date: Date): boolean {
+  const ft = med.frequency_type ?? inferFrequencyTypeFromLegacyFrequency(med.frequency);
+  if (ft !== 'weekly') return false;
+
+  const days = med.days_of_week ?? [];
+  if (days.length === 0) return false;
+
+  const dow = new Date(date).getDay(); // 0=Sun..6=Sat
+  return days.includes(dow);
+}
 
 /** Invalidate every `useMedications` query (any family id). Avoids stale `family?.id` in mutation closures. */
 function isMedicationsListQuery(q: Query): boolean {
@@ -43,22 +56,40 @@ export function parseMedicationSchedule(med: Medication): MedSchedule {
   return { dosesRequired: doses, periodType: 'daily' };
 }
 
-export function computeDoseStatus(med: Medication, logs: RawMedLog[] | undefined): DoseStatusKey {
+export function computeDoseStatusForDate(
+  med: Medication,
+  logs: RawMedLog[] | undefined,
+  date: Date
+): DoseStatusKey {
   const { dosesRequired, periodType } = parseMedicationSchedule(med);
   if (periodType === 'as_needed') return 'as_needed';
 
-  const now = new Date();
-  const windowStart = new Date(now);
+  const dayStart = startOfLocalDay(date);
+  const dayEnd = endOfLocalDay(date);
+
   if (periodType === 'daily') {
-    windowStart.setHours(0, 0, 0, 0);
-  } else {
-    windowStart.setDate(windowStart.getDate() - 7);
-    windowStart.setHours(0, 0, 0, 0);
+    const inDay = (logs ?? []).filter((l) => {
+      const t = new Date(l.scheduled_at);
+      return t >= dayStart && t <= dayEnd;
+    });
+    const taken = inDay.filter((l) => l.status === 'taken').length;
+    const missed = inDay.filter((l) => l.status === 'missed').length;
+
+    if (taken >= dosesRequired) return 'taken';
+    if (taken > 0) return 'partial';
+    if (missed > 0) return 'missed';
+    return 'pending';
   }
 
-  const inWindow = (logs ?? []).filter((l) => new Date(l.scheduled_at) >= windowStart);
-  const taken = inWindow.filter((l) => l.status === 'taken').length;
-  const missed = inWindow.filter((l) => l.status === 'missed').length;
+  // Weekly: due only on selected weekday(s), satisfied per scheduled day.
+  if (!isWeeklyScheduledForDate(med, date)) return 'taken';
+
+  const inDay = (logs ?? []).filter((l) => {
+    const t = new Date(l.scheduled_at);
+    return t >= dayStart && t <= dayEnd;
+  });
+  const taken = inDay.filter((l) => l.status === 'taken').length;
+  const missed = inDay.filter((l) => l.status === 'missed').length;
 
   if (taken >= dosesRequired) return 'taken';
   if (taken > 0) return 'partial';
@@ -66,33 +97,58 @@ export function computeDoseStatus(med: Medication, logs: RawMedLog[] | undefined
   return 'pending';
 }
 
+export function computeDoseStatus(med: Medication, logs: RawMedLog[] | undefined): DoseStatusKey {
+  return computeDoseStatusForDate(med, logs, new Date());
+}
+
 /** Expected dose slots for “today” summary (daily = doses per day; weekly = 1 rolling slot). */
-export function scheduledDoseSlotsToday(med: Medication): number {
+export function scheduledDoseSlotsForDate(med: Medication, date: Date): number {
   const { dosesRequired, periodType } = parseMedicationSchedule(med);
   if (periodType === 'as_needed') return 0;
-  if (periodType === 'weekly') return 1;
+  if (periodType === 'weekly') return isWeeklyScheduledForDate(med, date) ? 1 : 0;
   return dosesRequired;
+}
+
+/** Expected dose slots for “today” summary (daily = doses per day; weekly = 1 if scheduled today). */
+export function scheduledDoseSlotsToday(med: Medication): number {
+  return scheduledDoseSlotsForDate(med, new Date());
 }
 
 /**
  * How many of today’s expected slots are satisfied.
  * Daily: count of `taken` logs since local midnight, capped at `dosesRequired`.
- * Weekly: 1 if the rolling week window is fully satisfied (same rule as {@link computeDoseStatus}).
+ * Weekly: 1 if scheduled today and a `taken` log exists today.
  */
+export function takenDoseSlotsForDate(
+  med: Medication,
+  logs: RawMedLog[] | undefined,
+  date: Date
+): number {
+  const { dosesRequired, periodType } = parseMedicationSchedule(med);
+  if (periodType === 'as_needed') return 0;
+  if (periodType === 'weekly') {
+    if (!isWeeklyScheduledForDate(med, date)) return 0;
+    const dayStart = startOfLocalDay(date);
+    const dayEnd = endOfLocalDay(date);
+    const taken = (logs ?? []).some((l) => {
+      const t = new Date(l.scheduled_at);
+      return t >= dayStart && t <= dayEnd && l.status === 'taken';
+    });
+    return taken ? 1 : 0;
+  }
+  const dayStart = startOfLocalDay(date);
+  const taken = (logs ?? []).filter((l) => new Date(l.scheduled_at) >= dayStart && l.status === 'taken')
+    .length;
+  return Math.min(taken, dosesRequired);
+}
+
 export function takenDoseSlotsToday(
   med: Medication,
   logs: RawMedLog[] | undefined,
   todayStart: Date
 ): number {
-  const { dosesRequired, periodType } = parseMedicationSchedule(med);
-  if (periodType === 'as_needed') return 0;
-  if (periodType === 'weekly') {
-    return computeDoseStatus(med, logs) === 'taken' ? 1 : 0;
-  }
-  const taken = (logs ?? []).filter(
-    (l) => new Date(l.scheduled_at) >= todayStart && l.status === 'taken'
-  ).length;
-  return Math.min(taken, dosesRequired);
+  // Back-compat: prior callers already passed a day-start date; treat that as “the date”.
+  return takenDoseSlotsForDate(med, logs, todayStart);
 }
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
@@ -126,6 +182,9 @@ export function useAddMedication() {
       dosage: string;
       frequency: string;
       times: string[] | null;
+      frequency_type: MedicationFrequencyType;
+      times_per_day: number | null;
+      days_of_week: number[] | null;
       notes?: string;
       created_by: string;
       quantity_remaining?: number | null;
@@ -133,21 +192,42 @@ export function useAddMedication() {
     }) => {
       const familyId = useFamilyStore.getState().family?.id;
       if (!familyId) throw new Error('No family selected. Join or create a family first.');
-      const { error } = await supabase.from('medications').insert({
-        family_id: familyId,
-        name: input.name,
-        dosage: input.dosage,
-        frequency: input.frequency,
-        times: input.times,
-        notes: input.notes ?? null,
-        created_by: input.created_by,
-        quantity_remaining: input.quantity_remaining ?? null,
-        refill_threshold: input.refill_threshold ?? null,
-      });
+      const { data, error } = await supabase
+        .from('medications')
+        .insert({
+          family_id: familyId,
+          name: input.name,
+          dosage: input.dosage,
+          frequency: input.frequency,
+          times: input.times,
+          frequency_type: input.frequency_type,
+          times_per_day: input.times_per_day,
+          days_of_week: input.days_of_week,
+          notes: input.notes ?? null,
+          created_by: input.created_by,
+          quantity_remaining: input.quantity_remaining ?? null,
+          refill_threshold: input.refill_threshold ?? null,
+        })
+        .select('*')
+        .single();
       if (error) throw error;
+      return data as Medication;
     },
-    onSuccess: async () => {
+    onSuccess: async (created) => {
       await queryClient.invalidateQueries({ predicate: isMedicationsListQuery });
+      if (
+        created &&
+        shouldFireRefillBecameLow(null, {
+          quantity_remaining: created.quantity_remaining,
+          refill_threshold: created.refill_threshold,
+        })
+      ) {
+        await scheduleMedicationRefillNotification(
+          created.name,
+          created.quantity_remaining!,
+          created.id,
+        );
+      }
     },
   });
 }
@@ -161,16 +241,46 @@ export function useUpdateMedication() {
       dosage: string;
       frequency: string;
       times: string[] | null;
+      frequency_type: MedicationFrequencyType;
+      times_per_day: number | null;
+      days_of_week: number[] | null;
       notes?: string;
       quantity_remaining?: number | null;
       refill_threshold?: number | null;
     }) => {
+      const familyId = useFamilyStore.getState().family?.id;
+      const prevList = familyId
+        ? queryClient.getQueryData<Medication[]>(['medications', familyId])
+        : undefined;
+      const prevMed = prevList?.find((m) => m.id === input.id) ?? null;
       const { id, ...rest } = input;
       const { error } = await supabase.from('medications').update(rest).eq('id', id);
       if (error) throw error;
+      const next = {
+        quantity_remaining: input.quantity_remaining ?? null,
+        refill_threshold: input.refill_threshold ?? null,
+      };
+      return {
+        prevMed,
+        next,
+        name: input.name,
+        medicationId: id,
+      };
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ predicate: isMedicationsListQuery });
+      const prevLevel = result?.prevMed
+        ? {
+            quantity_remaining: result.prevMed.quantity_remaining,
+            refill_threshold: result.prevMed.refill_threshold,
+          }
+        : null;
+      if (result && shouldFireRefillBecameLow(prevLevel, result.next)) {
+        const q = result.next.quantity_remaining;
+        if (q != null) {
+          await scheduleMedicationRefillNotification(result.name, q, result.medicationId);
+        }
+      }
     },
   });
 }
@@ -185,6 +295,18 @@ export function useDeactivateMedication() {
         .update({ active: false })
         .eq('id', id);
       if (error) throw error;
+    },
+    onMutate: async (id) => {
+      const familyId = useFamilyStore.getState().family?.id;
+      if (!familyId) return {};
+      const key = ['medications', familyId] as const;
+      await queryClient.cancelQueries({ predicate: isMedicationsListQuery });
+      const prev = queryClient.getQueryData<Medication[]>(key);
+      queryClient.setQueryData<Medication[]>(key, (old) => old?.filter((m) => m.id !== id) ?? []);
+      return { prev, key };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev !== undefined && ctx.key) queryClient.setQueryData(ctx.key, ctx.prev);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ predicate: isMedicationsListQuery });
@@ -271,33 +393,67 @@ export function useLogDose() {
           .eq('id', input.medication_id);
         if (qErr) throw qErr;
 
-        if (refill_threshold !== null && newQty <= refill_threshold) {
-          await scheduleRefillAlert(input.medication_name, newQty);
+        const prevLevel = { quantity_remaining, refill_threshold };
+        const nextLevel = { quantity_remaining: newQty, refill_threshold };
+        if (shouldFireRefillBecameLow(prevLevel, nextLevel)) {
+          await scheduleMedicationRefillNotification(
+            input.medication_name,
+            newQty,
+            input.medication_id,
+          );
         }
       }
     },
     onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: ['medication_logs_today', family?.id] });
-      const prev = queryClient.getQueryData<MedLogsMap>(['medication_logs_today', family?.id]);
-      queryClient.setQueryData<MedLogsMap>(
-        ['medication_logs_today', family?.id],
-        (old) => {
-          const existing = old ?? {};
-          const current = existing[vars.medication_id] ?? [];
-          return {
-            ...existing,
-            [vars.medication_id]: [
-              ...current,
-              { status: vars.status, scheduled_at: vars.scheduled_at },
-            ],
-          };
-        }
-      );
-      return { prev };
+      const familyId = family?.id;
+      if (!familyId) return {};
+
+      const logsKey = ['medication_logs_today', familyId] as const;
+      const medsKey = ['medications', familyId] as const;
+
+      await queryClient.cancelQueries({ queryKey: logsKey });
+      await queryClient.cancelQueries({ predicate: isMedicationsListQuery });
+
+      const prevLogs = queryClient.getQueryData<MedLogsMap>(logsKey);
+      const prevMeds =
+        vars.status === 'taken' && vars.quantity_remaining !== null && vars.quantity_remaining > 0
+          ? queryClient.getQueryData<Medication[]>(medsKey)
+          : undefined;
+
+      queryClient.setQueryData<MedLogsMap>(logsKey, (old) => {
+        const existing = old ?? {};
+        const current = existing[vars.medication_id] ?? [];
+        return {
+          ...existing,
+          [vars.medication_id]: [
+            ...current,
+            { status: vars.status, scheduled_at: vars.scheduled_at },
+          ],
+        };
+      });
+
+      if (
+        vars.status === 'taken' &&
+        vars.quantity_remaining !== null &&
+        vars.quantity_remaining > 0
+      ) {
+        queryClient.setQueryData<Medication[]>(medsKey, (old) =>
+          old?.map((m) =>
+            m.id === vars.medication_id
+              ? { ...m, quantity_remaining: vars.quantity_remaining! - 1 }
+              : m
+          ) ?? []
+        );
+      }
+
+      return { prevLogs, prevMeds, logsKey, medsKey };
     },
     onError: (_err, _vars, context) => {
-      if (context?.prev !== undefined) {
-        queryClient.setQueryData(['medication_logs_today', family?.id], context.prev);
+      if (context?.prevLogs !== undefined && context.logsKey) {
+        queryClient.setQueryData(context.logsKey, context.prevLogs);
+      }
+      if (context?.prevMeds !== undefined && context.medsKey) {
+        queryClient.setQueryData(context.medsKey, context.prevMeds);
       }
     },
     onSuccess: (_data, vars) => {
@@ -318,6 +474,20 @@ export function useRefillMedication() {
         .update({ quantity_remaining: input.quantity })
         .eq('id', input.id);
       if (error) throw error;
+    },
+    onMutate: async (input) => {
+      const familyId = useFamilyStore.getState().family?.id;
+      if (!familyId) return {};
+      const key = ['medications', familyId] as const;
+      await queryClient.cancelQueries({ predicate: isMedicationsListQuery });
+      const prev = queryClient.getQueryData<Medication[]>(key);
+      queryClient.setQueryData<Medication[]>(key, (old) =>
+        old?.map((m) => (m.id === input.id ? { ...m, quantity_remaining: input.quantity } : m)) ?? []
+      );
+      return { prev, key };
+    },
+    onError: (_err, _input, ctx) => {
+      if (ctx?.prev !== undefined && ctx.key) queryClient.setQueryData(ctx.key, ctx.prev);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: isMedicationsListQuery });

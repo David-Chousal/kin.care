@@ -12,7 +12,7 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      colorScheme: 'system',
+      colorScheme: 'dark',
       setColorScheme: (colorScheme) => set({ colorScheme }),
     }),
     {

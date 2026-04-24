@@ -14,6 +14,21 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
+/** Expo push ticket errors that mean the Expo push token should not be used again. */
+const STALE_TOKEN_TICKET_ERRORS = new Set(['DeviceNotRegistered']);
+
+interface ExpoPushTicket {
+  status: 'ok' | 'error';
+  id?: string;
+  message?: string;
+  details?: { error?: string };
+}
+
+interface ExpoPushSendResponse {
+  data?: ExpoPushTicket | ExpoPushTicket[];
+  errors?: unknown;
+}
+
 interface RequestBody {
   task_id: string;
   task_title: string;
@@ -108,22 +123,28 @@ Deno.serve(async (req: Request) => {
 
   // Send via Expo Push API
   let expoPushError: string | null = null;
+  let expoJson: ExpoPushSendResponse | null = null;
   try {
     const expoRes = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(messages),
     });
+    const text = await expoRes.text();
     if (!expoRes.ok) {
-      const text = await expoRes.text();
       expoPushError = `Expo push HTTP ${expoRes.status}: ${text}`;
+    } else {
+      try {
+        expoJson = JSON.parse(text) as ExpoPushSendResponse;
+      } catch {
+        expoPushError = `Expo push invalid JSON body: ${text.slice(0, 500)}`;
+      }
     }
   } catch (err) {
     expoPushError = String(err);
   }
 
   if (expoPushError) {
-    // Log failure but treat as non-fatal (save already succeeded)
     console.error('Expo push failed:', expoPushError);
     return new Response(JSON.stringify({ ok: false, error: expoPushError }), {
       status: 200,
@@ -131,8 +152,79 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  return new Response(JSON.stringify({ ok: true, sent: messages.length }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const rawTickets = expoJson?.data;
+  const tickets: ExpoPushTicket[] = Array.isArray(rawTickets)
+    ? rawTickets
+    : rawTickets
+      ? [rawTickets]
+      : [];
+
+  if (tickets.length === 0) {
+    const msg = 'Expo push returned no ticket data';
+    console.error(msg, { top_level_errors: expoJson?.errors });
+    return new Response(JSON.stringify({ ok: false, error: msg, expo_errors: expoJson?.errors }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (tickets.length !== messages.length) {
+    console.error('Expo push ticket count mismatch', {
+      tickets: tickets.length,
+      messages: messages.length,
+    });
+  }
+
+  const ticketErrors: { index: number; code?: string }[] = [];
+  let prunedStaleTokens = 0;
+  const n = Math.min(tickets.length, tokenRows.length);
+
+  for (let i = 0; i < n; i++) {
+    const ticket = tickets[i];
+    const token = tokenRows[i].token;
+
+    if (ticket.status === 'ok') continue;
+
+    const code = ticket.details?.error;
+    if (code && STALE_TOKEN_TICKET_ERRORS.has(code)) {
+      const { error: delErr } = await adminClient
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', new_assignee_id)
+        .eq('token', token);
+
+      if (delErr) {
+        console.error('Failed to prune stale push token:', delErr.message, { index: i, code });
+        ticketErrors.push({ index: i, code: `${code}_prune_failed` });
+      } else {
+        prunedStaleTokens += 1;
+        console.info('Pruned stale push token', { user_id: new_assignee_id, index: i, code });
+      }
+      continue;
+    }
+
+    ticketErrors.push({ index: i, code });
+    console.error('Expo push ticket error', {
+      index: i,
+      code: code ?? 'unknown',
+      message: ticket.message?.slice(0, 200),
+    });
+  }
+
+  const accepted = tickets.filter((t) => t.status === 'ok').length;
+  const failedTickets = tickets.filter((t) => t.status === 'error').length;
+
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      sent: accepted,
+      failed_tickets: failedTickets,
+      pruned_stale_tokens: prunedStaleTokens,
+      ...(ticketErrors.length > 0 ? { ticket_errors: ticketErrors } : {}),
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 });

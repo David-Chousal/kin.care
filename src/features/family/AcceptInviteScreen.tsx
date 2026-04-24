@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
@@ -27,6 +28,7 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
   const styles = makeStyles(t);
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const setFamily = useFamilyStore((s) => s.setFamily);
 
   const [token, setToken] = useState('');
@@ -58,6 +60,12 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
     }
 
     const invitation = inv as Invitation;
+
+    if (new Date(invitation.expires_at).getTime() <= Date.now()) {
+      setError('This invite code has expired. Ask a family admin to send a new one.');
+      setLoading(false);
+      return;
+    }
 
     if (invitation.email.toLowerCase() !== (user.email ?? '').toLowerCase()) {
       setError('This invite was sent to a different email address.');
@@ -100,14 +108,21 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
       return;
     }
 
-    setFamily(familyData as Family);
+    const nextFamily = familyData as Family;
+    setFamily(nextFamily);
+    queryClient.setQueryData(['family', user.id], nextFamily);
     setLoading(false);
   }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
       {onBack ? (
-        <TouchableOpacity onPress={onBack} style={styles.back}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.back}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
           <Icon name="back" size={18} color={t.accent} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
@@ -128,6 +143,8 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           editable={!loading}
+          accessibilityLabel="Invite code"
+          accessibilityHint="Enter the code from your invitation email or message."
         />
 
         {error && <Text style={styles.error}>{error}</Text>}
@@ -136,6 +153,9 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleJoin}
           disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Join family"
+          accessibilityState={{ disabled: loading }}
         >
           {loading ? (
             <ActivityIndicator color={t.surface} />
@@ -146,7 +166,12 @@ export function AcceptInviteScreen({ onBack, footerAction }: Props) {
       </View>
 
       {footerAction ? (
-        <TouchableOpacity style={[styles.footerLink, { paddingBottom: insets.bottom + spacing.lg }]} onPress={footerAction.onPress}>
+        <TouchableOpacity
+          style={[styles.footerLink, { paddingBottom: insets.bottom + spacing.lg }]}
+          onPress={footerAction.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={footerAction.label}
+        >
           <Text style={styles.footerLinkText}>{footerAction.label}</Text>
         </TouchableOpacity>
       ) : null}

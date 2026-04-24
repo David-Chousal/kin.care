@@ -28,7 +28,7 @@ export function useFamily() {
 
   const query = useQuery<Family | null>({
     queryKey: ['family', user?.id],
-    queryFn: () => fetchFamilyForUser(user!.id),
+    queryFn: () => (user?.id ? fetchFamilyForUser(user.id) : Promise.resolve(null)),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,
   });

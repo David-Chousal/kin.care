@@ -1,6 +1,7 @@
 -- ============================================================
 -- Family Notes
--- Timestamped, attributed notes shared across a family group.
+-- Replaces legacy remote version `20260422` (invalid filename pattern).
+-- Idempotent: safe if family_notes already exists from an older apply.
 -- ============================================================
 
 create table if not exists public.family_notes (
@@ -16,18 +17,22 @@ create index if not exists family_notes_family_id_idx on public.family_notes (fa
 
 alter table public.family_notes enable row level security;
 
+drop policy if exists "family members can view notes" on public.family_notes;
 create policy "family members can view notes"
   on public.family_notes for select
   using (public.is_family_member(family_id));
 
+drop policy if exists "family members can create notes" on public.family_notes;
 create policy "family members can create notes"
   on public.family_notes for insert
   with check (public.is_family_member(family_id) and auth.uid() = created_by);
 
+drop policy if exists "note author can update" on public.family_notes;
 create policy "note author can update"
   on public.family_notes for update
   using (created_by = auth.uid());
 
+drop policy if exists "note author can delete" on public.family_notes;
 create policy "note author can delete"
   on public.family_notes for delete
   using (created_by = auth.uid());
@@ -41,9 +46,18 @@ begin
 end;
 $$;
 
+drop trigger if exists family_notes_updated_at on public.family_notes;
 create trigger family_notes_updated_at
   before update on public.family_notes
   for each row execute procedure public.set_updated_at();
 
--- enable realtime
-alter publication supabase_realtime add table public.family_notes;
+-- enable realtime (ignore if already in publication)
+do $$
+begin
+  alter publication supabase_realtime add table public.family_notes;
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+notify pgrst, 'reload schema';

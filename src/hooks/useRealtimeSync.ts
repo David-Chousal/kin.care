@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useFamilyStore } from '../store/family';
+import { useSyncConnectivityStore } from '../store/syncConnectivity';
 
 type TableSync = {
   table: string;
@@ -47,7 +49,14 @@ export function useRealtimeSync() {
   const familyId = useFamilyStore((s) => s.family?.id);
 
   useEffect(() => {
-    if (!familyId) return;
+    if (!familyId) {
+      useSyncConnectivityStore.getState().setFamilyRealtimeUi('inactive');
+      return;
+    }
+
+    let cancelled = false;
+    const setUi = useSyncConnectivityStore.getState().setFamilyRealtimeUi;
+    setUi('inactive');
 
     const channel = supabase.channel(`family-sync:${familyId}`);
 
@@ -63,9 +72,25 @@ export function useRealtimeSync() {
       );
     }
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (cancelled) return;
+      switch (status) {
+        case REALTIME_SUBSCRIBE_STATES.SUBSCRIBED:
+          setUi('subscribed');
+          break;
+        case REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR:
+        case REALTIME_SUBSCRIBE_STATES.TIMED_OUT:
+        case REALTIME_SUBSCRIBE_STATES.CLOSED:
+          setUi('syncPaused');
+          break;
+        default:
+          break;
+      }
+    });
 
     return () => {
+      cancelled = true;
+      setUi('inactive');
       supabase.removeChannel(channel);
     };
   }, [familyId, queryClient]);

@@ -1,10 +1,12 @@
 import { View, Text, Switch, StyleSheet, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAccessibilityStore } from '../../store/accessibility';
 import { useTheme, type Theme } from '../../theme';
 
 export function AccessibilityScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const hapticsEnabled = useAccessibilityStore((s) => s.hapticsEnabled);
   const setHapticsEnabled = useAccessibilityStore((s) => s.setHapticsEnabled);
 
@@ -19,9 +21,9 @@ export function AccessibilityScreen() {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.rowLabel}>Haptic feedback</Text>
+              <Text style={styles.rowLabel}>{tx('settings.accessibility.haptics.label')}</Text>
               <Text style={styles.rowSublabel}>
-                Light vibrations when you log doses, complete tasks, expand lists, and more
+                {tx('settings.accessibility.haptics.sublabel')}
               </Text>
             </View>
             <Switch
@@ -34,7 +36,7 @@ export function AccessibilityScreen() {
         </View>
 
         <Text style={styles.footnote}>
-          Screen transitions follow your device’s Reduce Motion setting when available.
+          {tx('settings.accessibility.footnote')}
         </Text>
       </ScrollView>
     </View>

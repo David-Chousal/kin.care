@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Switch, StyleSheet, ScrollView, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { useTranslation } from 'react-i18next';
 import { useTheme, type Theme } from '../../theme';
 import { useNotificationPrefs } from '../../store/notifications';
 import {
@@ -50,11 +51,13 @@ function ToggleRow({
 export function NotificationsScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const notifPrefs = useNotificationPrefs();
 
   const [permissionStatus, setPermissionStatus] = useState<string>('undetermined');
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     Notifications.getPermissionsAsync().then(({ status }) => {
       setPermissionStatus(status);
       notifPrefs.syncPermissionStatus(status);
@@ -120,6 +123,28 @@ export function NotificationsScreen() {
     }
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.card}>
+            <View style={styles.webCallout}>
+              <Text style={styles.webCalloutTitle}>{tx('settings.notifications.webNotSupported.title')}</Text>
+              <Text style={styles.webCalloutBody}>
+                {tx('settings.notifications.webNotSupported.body')}
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -130,43 +155,44 @@ export function NotificationsScreen() {
       >
           <View style={styles.card}>
             <ToggleRow
-              label="Push Notifications"
-              sublabel={permissionStatus === 'denied' ? 'Disabled in system Settings' : undefined}
+              label={tx('settings.notifications.master.label')}
+              sublabel={permissionStatus === 'denied' ? tx('settings.notifications.master.disabledInSystem') : undefined}
               value={notifPrefs.masterEnabled && systemAllowsNotifications}
               onValueChange={handleMasterToggle}
             />
             <Divider />
             <ToggleRow
-              label="Task Reminders"
+              label={tx('settings.notifications.taskReminders.label')}
               value={notifPrefs.taskReminders && notificationsOn}
               onValueChange={(v) => handleSubToggle('taskReminders', v, 'settings')}
               indent
             />
             <Divider />
             <ToggleRow
-              label="Task Assigned to Me"
-              sublabel="Push when a family member assigns a task to you"
+              label={tx('settings.notifications.taskAssigned.label')}
+              sublabel={tx('settings.notifications.taskAssigned.sublabel')}
               value={notifPrefs.taskAssigned && notificationsOn}
               onValueChange={(v) => handleSubToggle('taskAssigned', v, 'settings')}
               indent
             />
             <Divider />
             <ToggleRow
-              label="Medication Alerts"
+              label={tx('settings.notifications.medicationAlerts.label')}
+              sublabel={tx('settings.notifications.medicationAlerts.sublabel')}
               value={notifPrefs.medicationAlerts && notificationsOn}
               onValueChange={(v) => handleSubToggle('medicationAlerts', v, 'medication_alert')}
               indent
             />
             <Divider />
             <ToggleRow
-              label="Check-in Reminders"
+              label={tx('settings.notifications.checkinReminders.label')}
               value={notifPrefs.checkinReminders && notificationsOn}
               onValueChange={(v) => handleSubToggle('checkinReminders', v, 'settings')}
               indent
             />
             <Divider />
             <ToggleRow
-              label="Event Reminders"
+              label={tx('settings.notifications.eventReminders.label')}
               value={notifPrefs.eventReminders && notificationsOn}
               onValueChange={(v) => handleSubToggle('eventReminders', v, 'calendar_reminder')}
               indent
@@ -174,7 +200,7 @@ export function NotificationsScreen() {
           </View>
 
           <Text style={styles.footnote}>
-            If notifications are disabled at the system level, enable them in your device's Settings.
+            {tx('settings.notifications.footnote')}
           </Text>
       </ScrollView>
     </View>
@@ -205,5 +231,8 @@ function makeStyles(t: Theme) {
       lineHeight: 18,
       color: t.textSecondary,
     },
+    webCallout: { padding: 16, gap: 8 },
+    webCalloutTitle: { fontSize: 16, fontWeight: '600', color: t.text },
+    webCalloutBody: { fontSize: 14, lineHeight: 20, color: t.textSecondary },
   });
 }

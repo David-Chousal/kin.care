@@ -2,13 +2,7 @@ import { StyleSheet, Platform, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useResolvedScheme } from '../lib/useResolvedScheme';
 import { useTheme } from '../theme';
-import {
-  GLASS_BLUR_INTENSITY,
-  frostGlassFallbackFill,
-  frostSolidFallbackColor,
-  frostVeilColor,
-  glassBlurPlatformProps,
-} from '../theme/glass';
+import { GLASS_BLUR_INTENSITY, frostGlassFallbackFill, frostVeilColor, glassBlurPlatformProps } from '../theme/glass';
 import { useGlassBlurPreferred } from '../navigation/useGlassBlurPreferred';
 
 export type HeaderFrostedBackdropMode = 'auto' | 'blur' | 'fallback';
@@ -70,26 +64,15 @@ export function HeaderFrostedBackdrop({
           ) : null}
         </>
       ) : (
-        <>
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              { backgroundColor: frostGlassFallbackFill(t, scheme) },
-            ]}
-          />
-          {veil ? (
-            <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                {
-                  backgroundColor:
-                    scheme === 'dark' ? `${frostSolidFallbackColor(t)}55` : `${frostSolidFallbackColor(t)}33`,
-                },
-              ]}
-              pointerEvents="none"
-            />
-          ) : null}
-        </>
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: frostGlassFallbackFill(t, scheme),
+            },
+          ]}
+          pointerEvents="none"
+        />
       )}
     </View>
   );

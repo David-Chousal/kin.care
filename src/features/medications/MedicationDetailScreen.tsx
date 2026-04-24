@@ -1,22 +1,34 @@
-import { useState, useLayoutEffect, useCallback } from 'react';
+import { useState, useLayoutEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { hapticNotification, NotificationFeedbackType } from '../../lib/haptics';
 import { Toast } from '../../components/Toast';
 import { useAuthStore } from '../../store/auth';
-import { useMedicationLogs, useLogDose, useDeactivateMedication, useRefillMedication } from './hooks/useMedications';
+import { useMedicationLogs, useLogDose, useDeactivateMedication } from './hooks/useMedications';
+import { useMedicationRefillPrompt } from './hooks/useMedicationRefillPrompt';
 import { useTheme, type Theme } from '../../theme';
 import { Icon } from '../../components/Icon';
 import type { Medication, MedicationLog } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
+import { useFamilyDoctors } from '../doctors/hooks/useFamilyDoctors';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 interface Props { medication: Medication; }
+
+function formatPrescriberNamesFallback(names: string[]): string {
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return names.join(', ');
+}
 
 function LogRow({ log }: { log: MedicationLog }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const formatLocale = useFormatLocaleTag();
   const STATUS_COLOR = { taken: t.success, missed: t.error, pending: t.warning };
   const d = new Date(log.scheduled_at);
   return (
@@ -24,8 +36,8 @@ function LogRow({ log }: { log: MedicationLog }) {
       <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[log.status as keyof typeof STATUS_COLOR] }]} />
       <View style={{ flex: 1 }}>
         <Text style={styles.logDate}>
-          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
-          {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          {d.toLocaleDateString(formatLocale, { month: 'short', day: 'numeric' })}{' '}
+          {d.toLocaleTimeString(formatLocale, { hour: 'numeric', minute: '2-digit' })}
         </Text>
         {log.notes ? <Text style={styles.logNotes}>{log.notes}</Text> : null}
       </View>
@@ -41,12 +53,35 @@ function LogRow({ log }: { log: MedicationLog }) {
 export function MedicationDetailScreen({ medication }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const formatLocale = useFormatLocaleTag();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { user } = useAuthStore();
   const { data: logs, isLoading, isFetching, refetch } = useMedicationLogs(medication.id);
+  const { data: doctors, isLoading: doctorsLoading } = useFamilyDoctors();
+  const prescribers = useMemo(() => {
+    if (!doctors) return [];
+    return doctors
+      .filter((d) => (d.linked_medication_ids ?? []).includes(medication.id))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [doctors, medication.id]);
+  const prescriberNamesText = useMemo(() => {
+    const names = prescribers.map((d) => d.name.trim() || tx('medications.detail.prescriberFallbackName'));
+    if (names.length === 0) return '';
+    try {
+      return new Intl.ListFormat(formatLocale, { style: 'long', type: 'conjunction' }).format(names);
+    } catch {
+      return formatPrescriberNamesFallback(names);
+    }
+  }, [prescribers, formatLocale, tx]);
+  const openDoctors = useCallback(() => {
+    navigation.navigate('Doctors');
+  }, [navigation]);
   const logDose = useLogDose();
   const { mutateAsync: deactivateMedication } = useDeactivateMedication();
-  const refillMedication = useRefillMedication();
+  const { promptRefill, isPending: isRefillPending, refillModalElement } = useMedicationRefillPrompt({
+    onSuccess: (message) => setToast({ visible: true, message }),
+  });
   const [logging, setLogging] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '' });
 
@@ -74,6 +109,10 @@ export function MedicationDetailScreen({ medication }: Props) {
   }, [navigation, medication.name, confirmRemove]);
 
   async function handleLogDose(status: 'taken' | 'missed') {
+    if (!user?.id) {
+      Alert.alert('Session expired', 'Please sign in again to log a dose.');
+      return;
+    }
     hapticNotification(
       status === 'taken' ? NotificationFeedbackType.Success : NotificationFeedbackType.Warning
     );
@@ -83,37 +122,12 @@ export function MedicationDetailScreen({ medication }: Props) {
       medication_name: medication.name,
       scheduled_at: new Date().toISOString(),
       status,
-      logged_by: user!.id,
+      logged_by: user.id,
       quantity_remaining: medication.quantity_remaining ?? null,
       refill_threshold: medication.refill_threshold ?? null,
     });
     setLogging(false);
     setToast({ visible: true, message: status === 'taken' ? 'Dose logged' : 'Dose marked as missed' });
-  }
-
-  function handleRefill() {
-    Alert.prompt(
-      'Refill medication',
-      `Enter the new quantity for ${medication.name}:`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: async (value: string | undefined) => {
-            const qty = parseInt(value ?? '', 10);
-            if (isNaN(qty) || qty < 0) {
-              Alert.alert('Invalid quantity', 'Please enter a valid number.');
-              return;
-            }
-            await refillMedication.mutateAsync({ id: medication.id, quantity: qty });
-            setToast({ visible: true, message: `Refilled — ${qty} remaining` });
-          },
-        },
-      ],
-      'plain-text',
-      medication.quantity_remaining != null ? String(medication.quantity_remaining) : '',
-      'number-pad',
-    );
   }
 
   const listHeader = (
@@ -132,6 +146,44 @@ export function MedicationDetailScreen({ medication }: Props) {
             <Text style={styles.infoSub}>{medication.notes}</Text>
           </View>
         ) : null}
+
+        <View style={styles.prescriberBlock}>
+          <Text style={styles.prescriberSectionLabel}>{tx('medications.detail.prescribedBy')}</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={openDoctors}
+            style={styles.prescriberRow}
+            accessibilityRole="button"
+            accessibilityLabel={
+              prescribers.length > 0
+                ? `${tx('medications.detail.prescribedBy')}: ${prescriberNamesText}`
+                : tx('medications.detail.openDoctorsA11y')
+            }
+          >
+            <Icon
+              name="doctor"
+              size={16}
+              color={prescribers.length > 0 ? t.textSecondary : t.accent}
+            />
+            {doctorsLoading ? (
+              <ActivityIndicator style={styles.prescriberSpinner} color={t.accent} />
+            ) : (
+              <View style={styles.prescriberTextCol}>
+                {prescribers.length > 0 ? (
+                  <Text style={styles.prescriberNames} numberOfLines={3}>
+                    {prescriberNamesText}
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={styles.prescriberEmptyPrimary}>{tx('medications.detail.notLinked')}</Text>
+                    <Text style={styles.prescriberEmptyHint}>{tx('medications.detail.openDoctorsHint')}</Text>
+                  </>
+                )}
+              </View>
+            )}
+            {!doctorsLoading ? <Icon name="chevron" size={18} color={t.textTertiary} /> : <View style={{ width: 18 }} />}
+          </TouchableOpacity>
+        </View>
         {medication.quantity_remaining != null ? (
           <View style={styles.refillRow}>
             <View style={[
@@ -144,7 +196,11 @@ export function MedicationDetailScreen({ medication }: Props) {
                 {medication.quantity_remaining} remaining
               </Text>
             </View>
-            <TouchableOpacity style={styles.refillBtn} onPress={handleRefill}>
+            <TouchableOpacity
+              style={[styles.refillBtn, isRefillPending && styles.refillBtnDisabled]}
+              onPress={() => promptRefill(medication)}
+              disabled={isRefillPending}
+            >
               <Text style={styles.refillBtnText}>Refill</Text>
             </TouchableOpacity>
           </View>
@@ -195,6 +251,7 @@ export function MedicationDetailScreen({ medication }: Props) {
         renderItem={({ item }) => <LogRow log={item} />}
       />
       <Toast message={toast.message} visible={toast.visible} onHide={() => setToast({ visible: false, message: '' })} />
+      {refillModalElement}
     </View>
   );
 }
@@ -210,6 +267,34 @@ function makeStyles(t: Theme) {
     infoText: { fontSize: 16, fontWeight: '600', color: t.text },
     infoSub: { fontSize: 14, color: t.textSecondary },
     infoSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+    prescriberBlock: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.border,
+      gap: 6,
+    },
+    prescriberSectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: t.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+    },
+    prescriberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 4,
+      marginHorizontal: -4,
+      paddingHorizontal: 4,
+      borderRadius: 8,
+    },
+    prescriberTextCol: { flex: 1, flexShrink: 1, gap: 2 },
+    prescriberNames: { fontSize: 15, fontWeight: '600', color: t.text },
+    prescriberEmptyPrimary: { fontSize: 15, fontWeight: '600', color: t.textSecondary },
+    prescriberEmptyHint: { fontSize: 13, color: t.textTertiary },
+    prescriberSpinner: { flex: 1, alignSelf: 'flex-start' },
     logButtons: { flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 14, marginBottom: 4 },
     logBtn: { flex: 1, paddingVertical: 15, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
     logBtnTaken: { backgroundColor: t.success },
@@ -237,6 +322,7 @@ function makeStyles(t: Theme) {
     quantityBadgeLow: { backgroundColor: t.error + '20' },
     quantityBadgeText: { fontSize: 13, fontWeight: '600', color: t.text },
     refillBtn: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: t.accent },
+    refillBtnDisabled: { opacity: 0.5 },
     refillBtnText: { fontSize: 13, fontWeight: '700', color: t.accent },
   });
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Platform,
+  Alert,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FormSheet } from '../../components/FormSheet';
@@ -14,6 +15,7 @@ import {
 import { useTheme, type Theme } from '../../theme';
 import { Icon } from '../../components/Icon';
 import type { FamilyDoctor } from '../../types';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 interface Props {
   visible: boolean;
@@ -24,6 +26,7 @@ interface Props {
 export function AddDoctorSheet({ visible, onClose, editing }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const formatLocale = useFormatLocaleTag();
   const { user } = useAuthStore();
   const { data: medications = [] } = useMedications();
   const addDoctor = useAddFamilyDoctor();
@@ -103,6 +106,10 @@ export function AddDoctorSheet({ visible, onClose, editing }: Props) {
       setFormError("Please enter the doctor's name.");
       return;
     }
+    if (!editing && !user?.id) {
+      Alert.alert('Session expired', 'Please sign in again to add a doctor.');
+      return;
+    }
     const nextIso = hasNextAppt
       ? (includeTime
         ? apptDate.toISOString()
@@ -110,36 +117,48 @@ export function AddDoctorSheet({ visible, onClose, editing }: Props) {
       : null;
     const medIds = [...linkedIds];
 
-    if (editing) {
-      await updateDoctor.mutateAsync({
-        id: editing.id,
-        name: name.trim(),
-        specialty: specialty.trim() || undefined,
-        phone: phone.trim() || undefined,
-        address: address.trim() || undefined,
-        next_appointment_at: nextIso,
-        linked_medication_ids: medIds,
-      });
-    } else {
-      await addDoctor.mutateAsync({
-        name: name.trim(),
-        specialty: specialty.trim() || undefined,
-        phone: phone.trim() || undefined,
-        address: address.trim() || undefined,
-        next_appointment_at: nextIso,
-        linked_medication_ids: medIds,
-        created_by: user!.id,
-      });
+    try {
+      if (editing) {
+        await updateDoctor.mutateAsync({
+          id: editing.id,
+          name: name.trim(),
+          specialty: specialty.trim() || undefined,
+          phone: phone.trim() || undefined,
+          address: address.trim() || undefined,
+          next_appointment_at: nextIso,
+          linked_medication_ids: medIds,
+        });
+      } else {
+        if (!user?.id) {
+          Alert.alert('Session expired', 'Please sign in again to add a doctor.');
+          return;
+        }
+        await addDoctor.mutateAsync({
+          name: name.trim(),
+          specialty: specialty.trim() || undefined,
+          phone: phone.trim() || undefined,
+          address: address.trim() || undefined,
+          next_appointment_at: nextIso,
+          linked_medication_ids: medIds,
+          created_by: user.id,
+        });
+      }
+      reset();
+      onClose();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : 'Something went wrong. Please try again.';
+      setFormError(`Could not save doctor. ${msg}`);
     }
-    reset();
-    onClose();
   }
 
   const isPending = addDoctor.isPending || updateDoctor.isPending;
-  const dateLabel = apptDate.toLocaleDateString('en-US', {
+  const dateLabel = apptDate.toLocaleDateString(formatLocale, {
     weekday: 'short', month: 'long', day: 'numeric', year: 'numeric',
   });
-  const timeLabel = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const timeLabel = apptDate.toLocaleTimeString(formatLocale, { hour: 'numeric', minute: '2-digit' });
 
   return (
     <FormSheet

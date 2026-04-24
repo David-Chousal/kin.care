@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "kin.care",
+    "name": "Kin",
     "slug": "kin-care",
     "scheme": "kincare",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app_icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,14 +15,17 @@
     },
     "ios": {
       "bundleIdentifier": "com.dchousal.kincare",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.dchousal.kincare",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/app_icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -32,15 +35,32 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "supabaseUrl": "https://toowcdabumseydziiodz.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb3djZGFidW1zZXlkemlpb2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTQyNzUsImV4cCI6MjA5MjAzMDI3NX0.d962DRPOY-uYNwwXDC1K8RRBNntA0XS6xLe7MQWNz54",
       "eas": {
         "projectId": "f94b78ad-c790-43d7-a030-94eb40f47bfa"
       }
     },
     "plugins": [
+      "./plugins/withSentryDisableUploadDefault.js",
+      "@react-native-async-storage/expo-with-async-storage",
       "@react-native-community/datetimepicker",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      "expo-localization",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Kin to access your photos to set your profile picture.",
+          "cameraPermission": "Allow Kin to use the camera for your profile picture."
+        }
+      ]
     ],
     "owner": "dchousal"
   }

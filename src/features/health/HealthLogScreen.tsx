@@ -1,11 +1,12 @@
-import { useRef, useState, useCallback, useLayoutEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert, Animated, Image } from 'react-native';
+import { useState, useCallback, useLayoutEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Image, Alert, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { showActionSheet } from '../../lib/actionSheet';
-import { Swipeable } from 'react-native-gesture-handler';
+import { SwipeToDelete } from '../../components/SwipeToDelete';
 import { SkeletonList } from '../../components/SkeletonCard';
-import { useHealthLogs, useDeleteHealthLog, healthLogPhotoPublicUrl } from './hooks/useHealthLogs';
+import { useHealthLogs, useDeleteHealthLog, useHealthLogPhotoUrl } from './hooks/useHealthLogs';
 import { HealthLogTrendSection } from './HealthLogTrendSection';
 import { AddHealthLogSheet } from './AddHealthLogSheet';
 import { useTheme, type Theme } from '../../theme';
@@ -15,6 +16,10 @@ import type { HealthLog, HealthLogCategory } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { EmptyState } from '../../components/EmptyState';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 const CATEGORY_META: Record<HealthLogCategory, { mci: string; color: string }> = {
   symptom: { mci: 'thermometer',       color: '#F59E0B' },
@@ -23,45 +28,32 @@ const CATEGORY_META: Record<HealthLogCategory, { mci: string; color: string }> =
   note:    { mci: 'note-text-outline', color: '#6B7280' },
 };
 
-const FILTER_OPTIONS: Array<{ key: HealthLogCategory | 'all'; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'symptom', label: 'Symptoms' },
-  { key: 'vital', label: 'Vitals' },
-  { key: 'mood', label: 'Mood' },
-  { key: 'note', label: 'Notes' },
+const FILTER_OPTIONS: Array<{ key: HealthLogCategory | 'all'; labelKey: string }> = [
+  { key: 'all', labelKey: 'health.filters.all' },
+  { key: 'symptom', labelKey: 'health.filters.symptoms' },
+  { key: 'vital', labelKey: 'health.filters.vitals' },
+  { key: 'mood', labelKey: 'health.filters.mood' },
+  { key: 'note', labelKey: 'health.filters.notes' },
 ];
 
-function SwipeableLogCard({ log, onDelete, onMenu }: { log: HealthLog; onDelete: () => void; onMenu: () => void }) {
+function LogCard({
+  log,
+  onMenu,
+  onPhoto,
+  onViewPhoto,
+}: {
+  log: HealthLog;
+  onMenu: () => void;
+  onPhoto: () => void;
+  onViewPhoto: (photoUri: string) => void;
+}) {
   const t = useTheme();
   const styles = makeStyles(t);
-  const swipeableRef = useRef<Swipeable>(null);
-  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
-    return (
-      <Animated.View style={[styles.swipeDeleteAction, { transform: [{ translateX }] }]}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => { swipeableRef.current?.close(); onDelete(); }}
-        >
-          <Icon name="trash" size={20} color={t.surface} />
-          <Text style={styles.swipeDeleteText}>Delete</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-  return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40}>
-      <LogCard log={log} onMenu={onMenu} />
-    </Swipeable>
-  );
-}
-
-function LogCard({ log, onMenu }: { log: HealthLog; onMenu: () => void }) {
-  const t = useTheme();
-  const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const formatLocale = useFormatLocaleTag();
   const meta = CATEGORY_META[log.category];
   const d = new Date(log.logged_at);
-  const photoUri = healthLogPhotoPublicUrl(log.photo_path);
+  const { data: photoUri } = useHealthLogPhotoUrl(log.photo_path);
   return (
     <View style={styles.card}>
       <View style={[styles.iconBadge, { backgroundColor: meta.color + '20' }]}>
@@ -78,16 +70,39 @@ function LogCard({ log, onMenu }: { log: HealthLog; onMenu: () => void }) {
           <Text style={styles.cardNotes} numberOfLines={2}>{log.notes}</Text>
         ) : null}
         {photoUri ? (
-          <Image source={{ uri: photoUri }} style={styles.cardPhoto} resizeMode="cover" />
+          <TouchableOpacity
+            onPress={() => onViewPhoto(photoUri)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={tx('health.a11y.viewPhoto')}
+            style={styles.photoThumbButton}
+          >
+            <Image source={{ uri: photoUri }} style={styles.photoThumb} resizeMode="cover" />
+          </TouchableOpacity>
         ) : null}
       </View>
       <View style={styles.cardRight}>
         <Text style={styles.cardDate}>
-          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {d.toLocaleDateString(formatLocale, { month: 'short', day: 'numeric' })}
         </Text>
-        <TouchableOpacity onPress={onMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.menuDots}>···</Text>
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            onPress={onPhoto}
+            style={styles.cardCameraBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={photoUri ? tx('health.a11y.changePhoto') : tx('health.a11y.addPhoto')}
+          >
+            <MaterialCommunityIcons name="camera-plus-outline" size={22} color={t.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onMenu}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={tx('health.a11y.entryOptions')}
+          >
+            <Text style={styles.menuDots}>···</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -96,24 +111,42 @@ function LogCard({ log, onMenu }: { log: HealthLog; onMenu: () => void }) {
 export function HealthLogScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { data: logs, isLoading, isFetching, refetch } = useHealthLogs();
   const deleteLog = useDeleteHealthLog();
+  const undoDelete = useUndoDelete();
   const [showAdd, setShowAdd] = useState(false);
   const [editingLog, setEditingLog] = useState<HealthLog | undefined>(undefined);
+  const [photoPickerNonce, setPhotoPickerNonce] = useState(0);
   const [filter, setFilter] = useState<HealthLogCategory | 'all'>('all');
+  const [viewingPhotoUri, setViewingPhotoUri] = useState<string | null>(null);
 
-  const openAdd = useCallback(() => setShowAdd(true), []);
+  const openAdd = useCallback(() => {
+    setEditingLog(undefined);
+    setPhotoPickerNonce(0);
+    setShowAdd(true);
+  }, []);
+
+  const openEditWithPhotoPicker = useCallback((log: HealthLog) => {
+    setEditingLog(log);
+    setShowAdd(true);
+    setPhotoPickerNonce((n) => n + 1);
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <NativeHeaderTextButton label="Add" onPress={openAdd} />,
+      headerRight: () => <NativeHeaderTextButton label={tx('common.add')} onPress={openAdd} />,
     });
-  }, [navigation, openAdd]);
+  }, [navigation, openAdd, tx]);
 
   function showMenu(log: HealthLog) {
     showActionSheet(
-      { options: ['Cancel', 'Edit', 'Delete'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+      {
+        options: [tx('common.cancel'), tx('common.edit'), tx('common.delete')],
+        destructiveButtonIndex: 2,
+        cancelButtonIndex: 0,
+      },
       (i) => {
         if (i === 1) { setEditingLog(log); setShowAdd(true); }
         if (i === 2) confirmDelete(log);
@@ -122,10 +155,14 @@ export function HealthLogScreen() {
   }
 
   function confirmDelete(log: HealthLog) {
-    Alert.alert('Delete Entry', `Delete "${log.title}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteLog.mutate(log.id) },
-    ]);
+    const title = log.title?.trim() || tx('common.entry');
+    undoDelete.scheduleDelete(tx('common.removed', { item: title }), () =>
+      deleteLog.mutate(log.id, {
+        onError: (err) => {
+          Alert.alert(tx('health.errors.deleteFailedTitle'), errorMessageFromUnknown(err));
+        },
+      }),
+    );
   }
 
   const filtered = (logs ?? []).filter((l) => filter === 'all' || l.category === filter);
@@ -133,35 +170,35 @@ export function HealthLogScreen() {
 
   const emptyTitle =
     filter === 'all'
-      ? 'No entries yet'
+      ? tx('health.empty.all.title')
       : filter === 'symptom'
-        ? 'No symptoms yet'
+        ? tx('health.empty.symptoms.title')
         : filter === 'vital'
-          ? 'No vitals yet'
+          ? tx('health.empty.vitals.title')
           : filter === 'mood'
-            ? 'No mood entries yet'
-            : 'No notes yet';
+            ? tx('health.empty.mood.title')
+            : tx('health.empty.notes.title');
 
   const emptyMessage =
     filter === 'all'
-      ? 'Log symptoms, vitals, mood, or notes to spot patterns over time.'
+      ? tx('health.empty.all.message')
       : filter === 'symptom'
-        ? 'Nothing logged here yet. Add a symptom when something changes.'
+        ? tx('health.empty.symptoms.message')
         : filter === 'vital'
-          ? 'Nothing logged here yet. Add a vital when you have a reading.'
+          ? tx('health.empty.vitals.message')
           : filter === 'mood'
-            ? 'Nothing logged here yet. Capture how the day felt.'
-            : 'Nothing logged here yet. Jot a quick note for the team.';
+            ? tx('health.empty.mood.message')
+            : tx('health.empty.notes.message');
 
   const filterHeader = (
     <View style={styles.filterRow}>
-      {FILTER_OPTIONS.map(({ key, label }) => (
+      {FILTER_OPTIONS.map(({ key, labelKey }) => (
         <TouchableOpacity
           key={key}
           style={[styles.filterChip, filter === key && styles.filterChipActive]}
           onPress={() => setFilter(key)}
         >
-          <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text>
+          <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{tx(labelKey)}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -195,18 +232,59 @@ export function HealthLogScreen() {
                 icon="health"
                 title={emptyTitle}
                 message={emptyMessage}
-                actionLabel={filter === 'all' ? 'Add your first entry' : 'Add entry'}
+                actionLabel={filter === 'all' ? tx('health.empty.actions.first') : tx('health.empty.actions.add')}
                 onAction={openAdd}
               />
             }
-            renderItem={({ item }) => <SwipeableLogCard log={item} onDelete={() => confirmDelete(item)} onMenu={() => showMenu(item)} />}
+            renderItem={({ item }) => (
+              <SwipeToDelete
+                onDelete={() => confirmDelete(item)}
+                accessibilityLabel={item.title?.trim() || tx('health.a11y.entryFallback')}
+              >
+                <LogCard
+                  log={item}
+                  onMenu={() => showMenu(item)}
+                  onPhoto={() => openEditWithPhotoPicker(item)}
+                  onViewPhoto={(uri) => setViewingPhotoUri(uri)}
+                />
+              </SwipeToDelete>
+            )}
         />
       )}
+
+      <Modal
+        visible={!!viewingPhotoUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingPhotoUri(null)}
+      >
+        <TouchableOpacity
+          style={styles.photoModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setViewingPhotoUri(null)}
+          accessibilityRole="button"
+          accessibilityLabel={tx('health.a11y.closePhoto')}
+        >
+          <View style={styles.photoModalCard}>
+            {viewingPhotoUri ? (
+              <Image source={{ uri: viewingPhotoUri }} style={styles.photoModalImage} resizeMode="contain" />
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <AddHealthLogSheet
         visible={showAdd}
         editing={editingLog}
-        onClose={() => { setShowAdd(false); setEditingLog(undefined); }}
+        photoPickerNonce={photoPickerNonce}
+        onClose={() => { setShowAdd(false); setEditingLog(undefined); setPhotoPickerNonce(0); }}
+      />
+
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
       />
     </View>
   );
@@ -253,18 +331,47 @@ function makeStyles(t: Theme) {
     cardTitle: { fontSize: 15, fontWeight: '600', color: t.text },
     cardValue: { fontSize: 14, color: t.accent, fontWeight: '600', marginTop: 2 },
     cardNotes: { fontSize: 13, color: t.textTertiary, marginTop: 4 },
-    cardPhoto: {
-      width: '100%',
-      height: 112,
-      borderRadius: 10,
+    photoThumbButton: {
+      width: 64,
+      height: 64,
+      borderRadius: 12,
       marginTop: 8,
+      backgroundColor: t.surfaceAlt,
+      overflow: 'hidden',
+    },
+    photoThumb: {
+      width: '100%',
+      height: '100%',
       backgroundColor: t.surfaceAlt,
     },
     cardRight: { alignItems: 'flex-end', gap: 6 },
     cardDate: { fontSize: 12, color: t.textTertiary },
+    cardActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    cardCameraBtn: {
+      padding: 4,
+      borderRadius: 8,
+      backgroundColor: t.accentLight,
+    },
     menuDots: { fontSize: 16, color: t.textTertiary },
-    swipeDeleteAction: { width: 80, justifyContent: 'center', alignItems: 'center', backgroundColor: t.error, borderRadius: 14, marginBottom: 0 },
-    swipeDeleteBtn: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', gap: 4 },
-    swipeDeleteText: { color: t.surface, fontWeight: '700', fontSize: 12, textAlign: 'center' },
+    photoModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.88)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 18,
+    },
+    photoModalCard: {
+      width: '100%',
+      maxWidth: 560,
+      height: '80%',
+      borderRadius: 16,
+      backgroundColor: t.surface,
+      overflow: 'hidden',
+    },
+    photoModalImage: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: t.surfaceAlt,
+    },
   });
 }

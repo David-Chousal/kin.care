@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useLayoutEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,13 +7,19 @@ import { showActionSheet } from '../../lib/actionSheet';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { useMedications, useTodayMedLogs, useDeactivateMedication, computeDoseStatus, type MedLogsMap } from './hooks/useMedications';
 import { useFamilyInteractionWarnings } from './hooks/useDrugInteractions';
+import type { InteractionSeverity } from './services/drugInteractionService';
 import { AddMedicationSheet } from './AddMedicationSheet';
 import { useTheme, typography, type Theme } from '../../theme';
 import { Icon } from '../../components/Icon';
+import { AiHealthDisclaimer } from '../../components/AiHealthDisclaimer';
 import type { Medication } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { EmptyState } from '../../components/EmptyState';
+import { Toast } from '../../components/Toast';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { useMedicationRefillPrompt } from './hooks/useMedicationRefillPrompt';
 
 function TodayStatusDot({ med, todayLogs }: { med: Medication; todayLogs: MedLogsMap }) {
   const t = useTheme();
@@ -26,17 +32,48 @@ function TodayStatusDot({ med, todayLogs }: { med: Medication; todayLogs: MedLog
   return <View style={[styles.statusDot, styles.statusDotPending]} />;
 }
 
-function InteractionBadge() {
+function InteractionSeverityBadge({ severity }: { severity: InteractionSeverity }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const cfg =
+    severity === 'severe'
+      ? { label: 'Severe', bg: t.error + '22', fg: t.error }
+      : severity === 'moderate'
+        ? { label: 'Moderate', bg: t.warning + '28', fg: t.warning }
+        : { label: 'Mild', bg: t.info + '22', fg: t.info };
   return (
-    <View style={styles.interactionBadge}>
-      <Icon name="warning" size={12} color={t.warning} />
+    <View
+      style={[styles.interactionSeverityBadge, { backgroundColor: cfg.bg }]}
+      accessibilityRole="text"
+      accessibilityLabel={`Drug interaction, ${cfg.label}`}
+    >
+      <Icon name="warning" size={11} color={cfg.fg} />
+      <Text style={[styles.interactionSeverityBadgeText, { color: cfg.fg }]}>{cfg.label}</Text>
     </View>
   );
 }
 
-function SwipeableMedicationCard({ med, onPress, onDelete, onMenu, todayLogs, hasInteraction }: { med: Medication; onPress: () => void; onDelete: () => void; onMenu: () => void; todayLogs: MedLogsMap; hasInteraction: boolean }) {
+function SwipeableMedicationCard({
+  med,
+  onPress,
+  onDelete,
+  onMenu,
+  onRefill,
+  todayLogs,
+  interactionSeverity,
+  hasRefillTracking,
+  isRefillPending,
+}: {
+  med: Medication;
+  onPress: () => void;
+  onDelete: () => void;
+  onMenu: () => void;
+  onRefill: () => void;
+  todayLogs: MedLogsMap;
+  interactionSeverity: InteractionSeverity | null;
+  hasRefillTracking: boolean;
+  isRefillPending: boolean;
+}) {
   const t = useTheme();
   const styles = makeStyles(t);
   const swipeableRef = useRef<Swipeable>(null);
@@ -55,16 +92,43 @@ function SwipeableMedicationCard({ med, onPress, onDelete, onMenu, todayLogs, ha
       </Animated.View>
     );
   };
+  const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-88, 0] });
+    return (
+      <Animated.View style={[styles.swipeRefillAction, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={[styles.swipeRefillBtn, isRefillPending && styles.swipeRefillBtnDisabled]}
+          onPress={() => {
+            if (isRefillPending) return;
+            swipeableRef.current?.close();
+            onRefill();
+          }}
+          disabled={isRefillPending}
+        >
+          <Icon name="add" size={20} color={t.surface} />
+          <Text style={styles.swipeRefillText}>Refill</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
   return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40}>
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      renderLeftActions={hasRefillTracking ? renderLeftActions : undefined}
+      leftThreshold={40}
+    >
       <MedicationCard
         med={med}
         onPress={onPress}
         onMenu={onMenu}
         todayLogs={todayLogs}
-        hasInteraction={hasInteraction}
+        interactionSeverity={interactionSeverity}
         accessibilityLabel={medLabel}
+        hasRefillTracking={hasRefillTracking}
         onA11yRemove={() => { swipeableRef.current?.close(); onDelete(); }}
+        onA11yRefill={() => { swipeableRef.current?.close(); onRefill(); }}
       />
     </Swipeable>
   );
@@ -89,31 +153,47 @@ function MedicationCard({
   onPress,
   onMenu,
   todayLogs,
-  hasInteraction,
+  interactionSeverity,
   accessibilityLabel,
+  hasRefillTracking,
   onA11yRemove,
+  onA11yRefill,
 }: {
   med: Medication;
   onPress: () => void;
   onMenu: () => void;
   todayLogs: MedLogsMap;
-  hasInteraction: boolean;
+  interactionSeverity: InteractionSeverity | null;
   accessibilityLabel: string;
+  hasRefillTracking: boolean;
   onA11yRemove: () => void;
+  onA11yRefill: () => void;
 }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const a11ySeverity =
+    interactionSeverity === 'severe'
+      ? 'Severe interaction.'
+      : interactionSeverity === 'moderate'
+        ? 'Moderate interaction.'
+        : interactionSeverity === 'mild'
+          ? 'Mild interaction.'
+          : '';
+  const accessibilityHint = hasRefillTracking
+    ? 'Double tap to open details. Swipe right on the row to refill, swipe left to remove. Use custom actions for Refill, more actions, or Remove.'
+    : 'Double tap to open details. Swipe left on the row to remove. Use custom actions for more actions or Remove.';
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint="Double tap to open details. Swipe up or down for actions."
+      accessibilityLabel={[accessibilityLabel, a11ySeverity].filter(Boolean).join(' ')}
+      accessibilityHint={accessibilityHint}
       accessibilityActions={[
         { name: 'activate', label: 'Open details' },
         { name: 'edit', label: 'More actions' },
+        ...(hasRefillTracking ? [{ name: 'refill' as const, label: 'Refill' }] : []),
         { name: 'delete', label: 'Remove' },
       ]}
       onAccessibilityAction={(e) => {
@@ -124,6 +204,10 @@ function MedicationCard({
         }
         if (action === 'edit') {
           onMenu();
+          return;
+        }
+        if (action === 'refill' && hasRefillTracking) {
+          onA11yRefill();
           return;
         }
         if (action === 'delete') {
@@ -145,7 +229,7 @@ function MedicationCard({
         ) : null}
       </View>
       <RefillBadge med={med} />
-      {hasInteraction && <InteractionBadge />}
+      {interactionSeverity ? <InteractionSeverityBadge severity={interactionSeverity} /> : null}
       <TodayStatusDot med={med} todayLogs={todayLogs} />
       <TouchableOpacity
         onPress={onMenu}
@@ -165,10 +249,16 @@ export function MedicationListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { data: medications, isLoading, isFetching, refetch } = useMedications();
   const { data: todayLogMap = {} as MedLogsMap } = useTodayMedLogs();
-  const { interactingNames } = useFamilyInteractionWarnings(medications);
+  const { severityByDrugName } = useFamilyInteractionWarnings(medications);
   const deactivate = useDeactivateMedication();
+  const undoDelete = useUndoDelete();
+  const [toast, setToast] = useState({ visible: false, message: '' });
+  const { promptRefill, isPending: isRefillPending, refillModalElement } = useMedicationRefillPrompt({
+    onSuccess: (message) => setToast({ visible: true, message }),
+  });
   const [showAdd, setShowAdd] = useState(false);
   const [editingMed, setEditingMed] = useState<Medication | undefined>(undefined);
+  const [showInteractionInfo, setShowInteractionInfo] = useState(false);
 
   const openAdd = useCallback(() => setShowAdd(true), []);
 
@@ -185,21 +275,40 @@ export function MedicationListScreen() {
     [navigation],
   );
 
-  function showMenu(med: Medication) {
-    showActionSheet(
-      { options: ['Cancel', 'Edit', 'Remove'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
-      (i) => {
-        if (i === 1) { setEditingMed(med); setShowAdd(true); }
-        if (i === 2) confirmRemove(med);
-      },
-    );
-  }
+  const showMenu = useCallback(
+    (med: Medication) => {
+      const canRefill = med.quantity_remaining != null;
+      const rows: { label: string; kind: 'edit' | 'refill' | 'remove' }[] = [{ label: 'Edit', kind: 'edit' }];
+      if (canRefill) rows.push({ label: 'Refill', kind: 'refill' });
+      rows.push({ label: 'Remove', kind: 'remove' });
+      const options = ['Cancel', ...rows.map((r) => r.label)];
+      showActionSheet(
+        {
+          options,
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: options.length - 1,
+        },
+        (i) => {
+          if (i <= 0) return;
+          const row = rows[i - 1];
+          if (!row) return;
+          if (row.kind === 'edit') {
+            setEditingMed(med);
+            setShowAdd(true);
+          } else if (row.kind === 'refill') {
+            promptRefill(med);
+          } else {
+            confirmRemove(med);
+          }
+        },
+      );
+    },
+    [promptRefill],
+  );
 
   function confirmRemove(med: Medication) {
-    Alert.alert('Remove Medication', `Remove "${med.name}" from the active list?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deactivate.mutate(med.id) },
-    ]);
+    const name = med.name?.trim() || 'Medication';
+    undoDelete.scheduleDelete(`Removed: ${name}`, () => deactivate.mutate(med.id));
   }
 
   const legendHeader = (
@@ -208,6 +317,20 @@ export function MedicationListScreen() {
       <View style={styles.legendItem}><View style={[styles.statusDot, styles.statusDotPartial]} /><Text style={styles.legendText}>Partial</Text></View>
       <View style={styles.legendItem}><View style={[styles.statusDot, styles.statusDotMissed]} /><Text style={styles.legendText}>Missed</Text></View>
       <View style={styles.legendItem}><View style={[styles.statusDot, styles.statusDotPending]} /><Text style={styles.legendText}>Pending</Text></View>
+      <TouchableOpacity
+        style={styles.legendItem}
+        onPress={() => setShowInteractionInfo(true)}
+        accessibilityRole="button"
+        accessibilityLabel="About drug interaction severity on the list"
+      >
+        <View style={styles.interactionLegendSamples}>
+          <View style={[styles.interactionLegendDot, { backgroundColor: t.error }]} />
+          <View style={[styles.interactionLegendDot, { backgroundColor: t.warning }]} />
+          <View style={[styles.interactionLegendDot, { backgroundColor: t.info }]} />
+        </View>
+        <Text style={styles.legendText}>Severe · Moderate · Mild</Text>
+        <Text style={styles.legendInfoText}>Info</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -239,14 +362,19 @@ export function MedicationListScreen() {
               />
             }
             renderItem={({ item }) => (
-              <SwipeableMedicationCard
-                med={item}
-                onPress={() => openDetail(item)}
-                onDelete={() => confirmRemove(item)}
-                onMenu={() => showMenu(item)}
-                todayLogs={todayLogMap}
-                hasInteraction={interactingNames.has(item.name.toLowerCase())}
-              />
+              <View style={{ marginBottom: 10 }}>
+                <SwipeableMedicationCard
+                  med={item}
+                  onPress={() => openDetail(item)}
+                  onDelete={() => confirmRemove(item)}
+                  onMenu={() => showMenu(item)}
+                  onRefill={() => promptRefill(item)}
+                  todayLogs={todayLogMap}
+                  interactionSeverity={severityByDrugName.get(item.name.toLowerCase().trim()) ?? null}
+                  hasRefillTracking={item.quantity_remaining != null}
+                  isRefillPending={isRefillPending}
+                />
+              </View>
             )}
         />
       )}
@@ -256,6 +384,29 @@ export function MedicationListScreen() {
         editing={editingMed}
         onClose={() => { setShowAdd(false); setEditingMed(undefined); }}
       />
+
+      {showInteractionInfo ? (
+        <View style={styles.interactionInfoOverlay} pointerEvents="box-none">
+          <AiHealthDisclaimer kind="drug_interactions" />
+          <TouchableOpacity
+            onPress={() => setShowInteractionInfo(false)}
+            style={styles.interactionInfoDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Text style={styles.interactionInfoDismissText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <Toast message={toast.message} visible={toast.visible} onHide={() => setToast({ visible: false, message: '' })} />
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
+      />
+      {refillModalElement}
     </View>
   );
 }
@@ -276,7 +427,7 @@ function makeStyles(t: Theme) {
     list: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
     card: {
       flexDirection: 'row', alignItems: 'center', backgroundColor: t.surface,
-      borderRadius: 14, padding: 14, marginBottom: 10, gap: 12,
+      borderRadius: 14, padding: 14, gap: 12,
       shadowColor: t.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     },
     cardIcon: {
@@ -294,19 +445,52 @@ function makeStyles(t: Theme) {
       width: 88, marginVertical: 4, borderRadius: 12, paddingHorizontal: 8, gap: 4,
     },
     swipeDeleteText: { ...typography.footnote, color: t.surface, fontWeight: '700' },
+    swipeRefillAction: { justifyContent: 'center', alignItems: 'flex-start', width: 96 },
+    swipeRefillBtn: {
+      flex: 1, backgroundColor: t.accent, justifyContent: 'center', alignItems: 'center',
+      width: 88, marginVertical: 4, borderRadius: 12, paddingHorizontal: 8, gap: 4,
+    },
+    swipeRefillBtnDisabled: { opacity: 0.5 },
+    swipeRefillText: { ...typography.footnote, color: t.surface, fontWeight: '700' },
     refillBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
     refillBadgeOk: { backgroundColor: t.accentLight },
     refillBadgeLow: { backgroundColor: t.error + '20' },
     refillBadgeText: { ...typography.overline, fontWeight: '700' },
     refillBadgeTextOk: { color: t.accent },
     refillBadgeTextLow: { color: t.error },
-    interactionBadge: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: t.warning + '25',
+    interactionSeverityBadge: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 10,
+      maxWidth: 108,
     },
+    interactionSeverityBadgeText: {
+      ...typography.overline,
+      fontWeight: '800',
+      letterSpacing: 0.2,
+    },
+    interactionLegendSamples: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    interactionLegendDot: { width: 8, height: 8, borderRadius: 4 },
+    legendInfoText: { ...typography.overline, color: t.accent, fontWeight: '700', marginLeft: 2 },
+    interactionInfoOverlay: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 16,
+      gap: 10,
+    },
+    interactionInfoDismiss: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: t.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: t.borderLight,
+    },
+    interactionInfoDismissText: { ...typography.footnote, color: t.accent, fontWeight: '800' },
   });
 }

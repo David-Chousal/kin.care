@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, Modal,
   StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView,
@@ -6,12 +6,15 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { showActionSheet } from '../../lib/actionSheet';
-import { Swipeable } from 'react-native-gesture-handler';
-import { Animated } from 'react-native';
+import { SwipeToDelete } from '../../components/SwipeToDelete';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { hapticImpact, hapticNotification, ImpactFeedbackStyle, NotificationFeedbackType } from '../../lib/haptics';
 import { BlurredHeaderBar } from '../../components/BlurredHeaderBar';
+import { FormError } from '../../components/FormError';
 import { Toast } from '../../components/Toast';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
 import { useAuthStore } from '../../store/auth';
 import { useNotes, useAddNote, useUpdateNote, useDeleteNote } from './hooks/useNotes';
 import {
@@ -19,14 +22,17 @@ import {
   navigationTitleTextStyle, spacing, typography,
   NAVIGATION_HEADER_TOOLBAR, NAVIGATION_HEADER_CHROME_PAD,
 } from '../../theme';
-import { Icon } from '../../components/Icon';
+import { EmptyState } from '../../components/EmptyState';
 import type { FamilyNote } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
+import { renderMinimalMarkdown } from '../../lib/renderMinimalMarkdown';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 function NoteCard({ item, onMenu, isOwn }: { item: FamilyNote; onMenu: () => void; isOwn: boolean }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const formatLocale = useFormatLocaleTag();
   const d = new Date(item.created_at);
   const edited = item.updated_at !== item.created_at;
   return (
@@ -34,8 +40,8 @@ function NoteCard({ item, onMenu, isOwn }: { item: FamilyNote; onMenu: () => voi
       <View style={styles.cardMeta}>
         <Text style={styles.cardAuthor}>{item.author_name ?? 'Family member'}</Text>
         <Text style={styles.cardDate}>
-          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
-          {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          {d.toLocaleDateString(formatLocale, { month: 'short', day: 'numeric' })}{' '}
+          {d.toLocaleTimeString(formatLocale, { hour: 'numeric', minute: '2-digit' })}
           {edited ? ' · edited' : ''}
         </Text>
         {isOwn && (
@@ -44,7 +50,7 @@ function NoteCard({ item, onMenu, isOwn }: { item: FamilyNote; onMenu: () => voi
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.cardBody}>{item.body}</Text>
+      <View style={styles.cardBody}>{renderMinimalMarkdown(item.body, t, item.id, 'notes')}</View>
     </View>
   );
 }
@@ -52,28 +58,15 @@ function NoteCard({ item, onMenu, isOwn }: { item: FamilyNote; onMenu: () => voi
 function SwipeableNoteCard({
   item, isOwn, onDelete, onMenu,
 }: { item: FamilyNote; isOwn: boolean; onDelete: () => void; onMenu: () => void }) {
-  const t = useTheme();
-  const styles = makeStyles(t);
-  const swipeableRef = useRef<Swipeable>(null);
-  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
-    return (
-      <Animated.View style={[styles.swipeDeleteAction, { transform: [{ translateX }] }]}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => { swipeableRef.current?.close(); onDelete(); }}
-        >
-          <Icon name="trash" size={20} color={t.surface} />
-          <Text style={styles.swipeDeleteText}>Delete</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
   if (!isOwn) return <NoteCard item={item} onMenu={onMenu} isOwn={false} />;
+  const preview = item.body.replace(/\s+/g, ' ').trim().slice(0, 80);
   return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40}>
+    <SwipeToDelete
+      onDelete={onDelete}
+      accessibilityLabel={preview ? `Note: ${preview}` : 'Note'}
+    >
       <NoteCard item={item} onMenu={onMenu} isOwn />
-    </Swipeable>
+    </SwipeToDelete>
   );
 }
 
@@ -91,23 +84,50 @@ function NoteFormModal({ visible, editing, onClose, onSubmitted }: NoteFormProps
   const addNote = useAddNote();
   const updateNote = useUpdateNote();
   const [body, setBody] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (visible) setBody(editing?.body ?? '');
+    if (visible) {
+      setBody(editing?.body ?? '');
+      setFormError(null);
+    }
   }, [visible, editing?.id]);
 
-  function reset() { setBody(''); onClose(); }
+  function handleCancel() {
+    setBody('');
+    setFormError(null);
+    onClose();
+  }
 
   async function handleSubmit() {
     if (!body.trim()) { Alert.alert('Required', 'Please write a note.'); return; }
-    hapticNotification(NotificationFeedbackType.Success);
-    if (editing) {
-      await updateNote.mutateAsync({ id: editing.id, body: body.trim() });
-    } else {
-      await addNote.mutateAsync({ body: body.trim(), created_by: user!.id });
+    if (!editing && !user?.id) {
+      Alert.alert('Session expired', 'Please sign in again to post a note.');
+      return;
     }
-    reset();
-    onSubmitted();
+    setFormError(null);
+    try {
+      if (editing) {
+        await updateNote.mutateAsync({ id: editing.id, body: body.trim() });
+      } else {
+        if (!user?.id) {
+          Alert.alert('Session expired', 'Please sign in again to post a note.');
+          return;
+        }
+        await addNote.mutateAsync({ body: body.trim(), created_by: user.id });
+      }
+      hapticNotification(NotificationFeedbackType.Success);
+      setBody('');
+      onClose();
+      onSubmitted();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : 'Something went wrong. Please try again.';
+      const prefix = editing ? 'Could not update note.' : 'Could not post note.';
+      setFormError(`${prefix} ${msg}`);
+    }
   }
 
   const isPending = addNote.isPending || updateNote.isPending;
@@ -120,7 +140,7 @@ function NoteFormModal({ visible, editing, onClose, onSubmitted }: NoteFormProps
       >
         <View style={styles.dragHandle} />
         <BlurredHeaderBar style={styles.modalHeader} contentStyle={styles.modalHeaderInner}>
-          <TouchableOpacity onPress={reset}>
+          <TouchableOpacity onPress={handleCancel}>
             <Text style={styles.modalCancel}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{editing ? 'Edit Note' : 'New Note'}</Text>
@@ -132,13 +152,14 @@ function NoteFormModal({ visible, editing, onClose, onSubmitted }: NoteFormProps
         </BlurredHeaderBar>
 
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <FormError message={formError} />
           <Text style={styles.formLabel}>Note</Text>
           <TextInput
             style={[styles.input, styles.multiline]}
             placeholder="Write a note for the family…"
             placeholderTextColor={t.textTertiary}
             value={body}
-            onChangeText={setBody}
+            onChangeText={(v) => { setBody(v); if (formError) setFormError(null); }}
             multiline
             numberOfLines={6}
             autoFocus
@@ -156,6 +177,7 @@ export function NotesScreen() {
   const { user } = useAuthStore();
   const { data: notes, isLoading, isFetching, refetch } = useNotes();
   const deleteNote = useDeleteNote();
+  const undoDelete = useUndoDelete();
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<FamilyNote | undefined>(undefined);
   const [toast, setToast] = useState({ visible: false, message: '' });
@@ -182,10 +204,13 @@ export function NotesScreen() {
   }
 
   function confirmDelete(item: FamilyNote) {
-    Alert.alert('Delete Note', 'Delete this note? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteNote.mutate(item.id) },
-    ]);
+    undoDelete.scheduleDelete('Note removed', () =>
+      deleteNote.mutate(item.id, {
+        onError: (err) => {
+          setToast({ visible: true, message: `Could not delete note. ${errorMessageFromUnknown(err)}` });
+        },
+      }),
+    );
   }
 
   return (
@@ -200,16 +225,22 @@ export function NotesScreen() {
           data={notes ?? []}
           keyExtractor={(n) => n.id}
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.list, { paddingTop: 12 }]}
+          contentContainerStyle={[
+            styles.list,
+            { paddingTop: 12 },
+            (notes?.length ?? 0) === 0 && { flexGrow: 1 },
+          ]}
           refreshing={isFetching && !isLoading}
           onRefresh={refetch}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Icon name="notes" size={48} color={t.borderLight} />
-              <Text style={styles.emptyTitle}>No notes yet</Text>
-              <Text style={styles.emptyDesc}>Tap New to share an update with your family.</Text>
-            </View>
-          }
+          ListEmptyComponent={(
+            <EmptyState
+              icon="notes"
+              title="No notes yet"
+              message="Share updates with your family so everyone stays in the loop."
+              actionLabel="New note"
+              onAction={openNew}
+            />
+          )}
           renderItem={({ item }) => (
             <SwipeableNoteCard
               item={item}
@@ -232,6 +263,12 @@ export function NotesScreen() {
         }}
       />
       <Toast message={toast.message} visible={toast.visible} onHide={() => setToast({ visible: false, message: '' })} />
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
+      />
     </View>
   );
 }
@@ -265,9 +302,6 @@ function makeStyles(t: Theme) {
     },
     multiline: { height: 140, textAlignVertical: 'top' },
     list: { padding: 16, gap: 12, paddingBottom: 40 },
-    emptyState: { alignItems: 'center', paddingTop: 60, gap: 8 },
-    emptyTitle: { fontSize: 17, fontWeight: '600', color: t.text },
-    emptyDesc: { fontSize: 14, color: t.textTertiary, textAlign: 'center', paddingHorizontal: 40 },
     card: {
       backgroundColor: t.surface, borderRadius: 14, padding: 14,
       shadowColor: t.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
@@ -276,13 +310,7 @@ function makeStyles(t: Theme) {
     cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     cardAuthor: { fontSize: 13, fontWeight: '700', color: t.text },
     cardDate: { flex: 1, fontSize: 12, color: t.textTertiary },
-    cardBody: { fontSize: 15, color: t.text, lineHeight: 22 },
+    cardBody: { gap: 0 },
     menuDots: { fontSize: 18, color: t.textTertiary },
-    swipeDeleteAction: {
-      width: 80, justifyContent: 'center', alignItems: 'center',
-      backgroundColor: t.error, borderRadius: 14,
-    },
-    swipeDeleteBtn: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', gap: 4 },
-    swipeDeleteText: { color: t.surface, fontWeight: '700', fontSize: 12, textAlign: 'center' },
   });
 }

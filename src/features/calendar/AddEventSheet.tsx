@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Platform,
+  Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { FormSheet } from '../../components/FormSheet';
 import { FormError } from '../../components/FormError';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,16 +14,26 @@ import type { CalendarEvent } from '../../types';
 import { useTheme, type Theme } from '../../theme';
 import { Icon } from '../../components/Icon';
 import { requestNotificationPermission } from '../notifications/requestNotificationPermission';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   editing?: CalendarEvent;
+  draft?: {
+    title?: string;
+    description?: string;
+    location?: string;
+    startsAt?: string;
+    includeTime?: boolean;
+  };
 }
 
-export function AddEventSheet({ visible, onClose, editing }: Props) {
+export function AddEventSheet({ visible, onClose, editing, draft }: Props) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
+  const formatLocale = useFormatLocaleTag();
   const { user } = useAuthStore();
   const addEvent = useAddCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();
@@ -47,12 +59,22 @@ export function AddEventSheet({ visible, onClose, editing }: Props) {
         const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
         setIncludeTime(hasTime);
       } else {
-        setTitle(''); setDescription(''); setLocation('');
-        setDate(new Date()); setIncludeTime(false);
+        setTitle(draft?.title ?? '');
+        setDescription(draft?.description ?? '');
+        setLocation(draft?.location ?? '');
+        const d = draft?.startsAt ? new Date(draft.startsAt) : new Date();
+        setDate(d);
+        const explicitIncludeTime = draft?.includeTime;
+        if (typeof explicitIncludeTime === 'boolean') {
+          setIncludeTime(explicitIncludeTime);
+        } else {
+          const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+          setIncludeTime(hasTime);
+        }
       }
       setShowDatePicker(false); setShowTimePicker(false);
     }
-  }, [visible, editing?.id]);
+  }, [visible, editing?.id, draft?.title, draft?.description, draft?.location, draft?.startsAt, draft?.includeTime]);
 
   function reset() {
     setTitle(''); setDescription(''); setLocation('');
@@ -64,54 +86,82 @@ export function AddEventSheet({ visible, onClose, editing }: Props) {
   async function handleSubmit() {
     setFormError(null);
     if (!title.trim()) {
-      setFormError('Event title is required.');
+      setFormError(tx('calendar.addEvent.errors.titleRequired'));
+      return;
+    }
+    if (!editing && !user?.id) {
+      Alert.alert(tx('calendar.addEvent.alerts.sessionExpired.title'), tx('calendar.addEvent.alerts.sessionExpired.body'));
       return;
     }
     const starts_at = includeTime
       ? date.toISOString()
       : new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
 
-    if (editing) {
-      await updateEvent.mutateAsync({ id: editing.id, title: title.trim(), description: description.trim() || undefined, location: location.trim() || undefined, starts_at });
-      reset();
-      onClose();
-    } else {
-      await addEvent.mutateAsync({ title: title.trim(), description: description.trim() || undefined, location: location.trim() || undefined, starts_at, created_by: user!.id });
-      // Prompt for notification permission after saving a new event so the user
-      // understands why reminders are useful. Closes the sheet first.
-      reset();
-      onClose();
-      await requestNotificationPermission('calendar_reminder');
+    try {
+      if (editing) {
+        await updateEvent.mutateAsync({
+          id: editing.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          location: location.trim() || undefined,
+          starts_at,
+        });
+        reset();
+        onClose();
+      } else {
+        await addEvent.mutateAsync({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          location: location.trim() || undefined,
+          starts_at,
+          created_by: user!.id,
+        });
+        // Prompt for notification permission after saving a new event so the user
+        // understands why reminders are useful. Closes the sheet first.
+        reset();
+        onClose();
+        try {
+          await requestNotificationPermission('calendar_reminder');
+        } catch {
+          // ignore
+        }
+      }
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : tx('common.errors.genericTryAgain');
+      setFormError(tx('calendar.addEvent.errors.saveFailed', { message: msg }));
     }
   }
 
   const isPending = addEvent.isPending || updateEvent.isPending;
-  const dateLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
-  const timeLabel = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const dateLabel = date.toLocaleDateString(formatLocale, { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+  const timeLabel = date.toLocaleTimeString(formatLocale, { hour: 'numeric', minute: '2-digit' });
 
   return (
     <FormSheet
       visible={visible}
-      title={editing ? 'Edit Event' : 'New Event'}
+      title={editing ? tx('calendar.addEvent.titleEdit') : tx('calendar.addEvent.titleNew')}
       isSubmitting={isPending}
       onClose={() => { reset(); onClose(); }}
       onSubmit={handleSubmit}
     >
         <View style={styles.form}>
           <FormError message={formError} />
-          <Text style={styles.label}>Title *</Text>
+          <Text style={styles.label}>{tx('calendar.addEvent.fields.titleRequired')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Doctor appointment"
+            placeholder={tx('calendar.addEvent.placeholders.title')}
             placeholderTextColor={t.textTertiary}
             value={title}
             onChangeText={(v) => { setTitle(v); setFormError(null); }}
             returnKeyType="next"
-            accessibilityLabel="Event title"
+            accessibilityLabel={tx('calendar.addEvent.a11y.titleInput')}
             accessibilityState={formError ? { invalid: true } : undefined}
           />
 
-          <Text style={styles.label}>Date</Text>
+          <Text style={styles.label}>{tx('calendar.addEvent.fields.date')}</Text>
           <TouchableOpacity style={styles.pickerButton} onPress={() => setShowDatePicker(true)}>
             <Icon name="calendar" size={18} color={t.textSecondary} />
             <Text style={styles.pickerText}>{dateLabel}</Text>
@@ -130,12 +180,12 @@ export function AddEventSheet({ visible, onClose, editing }: Props) {
           )}
           {Platform.OS === 'ios' && showDatePicker && (
             <TouchableOpacity style={styles.pickerDone} onPress={() => setShowDatePicker(false)}>
-              <Text style={styles.pickerDoneText}>Done</Text>
+              <Text style={styles.pickerDoneText}>{tx('common.done')}</Text>
             </TouchableOpacity>
           )}
 
           <View style={styles.row}>
-            <Text style={styles.label}>Include Time</Text>
+            <Text style={styles.label}>{tx('calendar.addEvent.fields.includeTime')}</Text>
             <TouchableOpacity
               style={[styles.toggle, includeTime && styles.toggleOn]}
               onPress={() => setIncludeTime(!includeTime)}
@@ -163,26 +213,26 @@ export function AddEventSheet({ visible, onClose, editing }: Props) {
               )}
               {Platform.OS === 'ios' && showTimePicker && (
                 <TouchableOpacity style={styles.pickerDone} onPress={() => setShowTimePicker(false)}>
-                  <Text style={styles.pickerDoneText}>Done</Text>
+                  <Text style={styles.pickerDoneText}>{tx('common.done')}</Text>
                 </TouchableOpacity>
               )}
             </>
           )}
 
-          <Text style={styles.label}>Location</Text>
+          <Text style={styles.label}>{tx('calendar.addEvent.fields.location')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. St. Mary's Hospital"
+            placeholder={tx('calendar.addEvent.placeholders.location')}
             placeholderTextColor={t.textTertiary}
             value={location}
             onChangeText={setLocation}
             returnKeyType="next"
           />
 
-          <Text style={styles.label}>Notes</Text>
+          <Text style={styles.label}>{tx('calendar.addEvent.fields.notes')}</Text>
           <TextInput
             style={[styles.input, styles.multiline]}
-            placeholder="Optional notes…"
+            placeholder={tx('calendar.addEvent.placeholders.notes')}
             placeholderTextColor={t.textTertiary}
             value={description}
             onChangeText={setDescription}

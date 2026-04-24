@@ -16,9 +16,164 @@
   "common": {
     "cancel": "Cancel",
     "save": "Save",
-    "edit": "Edit"
+    "edit": "Edit",
+    "delete": "Delete",
+    "add": "Add",
+    "done": "Done",
+    "event": "Event",
+    "entry": "Entry",
+    "document": "Document",
+    "open": "Open",
+    "upload": "Upload",
+    "doctor": "Doctor",
+    "removed": "Removed: {{item}}",
+    "pleaseTryAgain": "Please try again.",
+    "clearAll": "Clear all",
+    "a11y": {
+      "swipeToRevealDeleteHint": "Swipe for delete."
+    },
+    "errors": {
+      "genericTryAgain": "Something went wrong. Please try again."
+    }
+  },
+  "subscription": {
+    "screenTitle": "Subscription",
+    "tierFeatureCaption": {
+      "family": "AI, vault, unlimited members",
+      "care_team": "Pro tools & priority support"
+    }
+  },
+  "medications": {
+    "detail": {
+      "screenTitle": "Medication"
+    }
+  },
+  "tasks": {
+    "board": {
+      "filters": {
+        "all": "All",
+        "mine": "Assigned to me",
+        "others": "Assigned to others"
+      },
+      "sections": {
+        "todo": "To do",
+        "completed": "Completed · {{count}}"
+      },
+      "countSuffix": " · {{count}}",
+      "unassigned": "Unassigned",
+      "memberFallback": "Member",
+      "due": "Due {{date}}",
+      "swipe": {
+        "done": "Done"
+      },
+      "toast": {
+        "updateFailed": "Could not update task. Please try again.",
+        "completed": "Task completed",
+        "updated": "Task updated",
+        "added": "Task added"
+      },
+      "completed": {
+        "showAll": "Show all",
+        "showLess": "Show less"
+      },
+      "empty": {
+        "filtered": {
+          "title": "No tasks here",
+          "mine": "No tasks assigned to you.",
+          "others": "No tasks assigned to others.",
+          "action": "Show all tasks"
+        },
+        "first": {
+          "title": "No tasks yet",
+          "message": "Create tasks for medications, appointments, or anything the team should remember.",
+          "action": "Add your first task"
+        },
+        "caughtUp": {
+          "title": "All caught up",
+          "message": "No open tasks right now. Add another when something new comes up.",
+          "action": "Add a task"
+        }
+      },
+      "a11y": {
+        "taskLabel": "Task: {{title}}",
+        "taskLabelNoTitle": "Task",
+        "actionsHint": "Actions available. Swipe up or down for actions.",
+        "moreActions": "More actions. {{taskLabel}}",
+        "markDone": "Mark as done. {{taskLabel}}",
+        "markNotDone": "Mark as not done. {{taskLabel}}",
+        "actionMarkDone": "Mark done",
+        "showAllCompleted": "Show all {{completedTotal}} completed tasks. {{hiddenCount}} hidden.",
+        "showFewerCompleted": "Show fewer completed tasks"
+      }
+    }
+  },
+  "connectivity": {
+    "offlineTitle": "You're offline",
+    "offlineBody": "Recently loaded screens still work. Edits stay on this device and sync when you're back online. In hospitals or large buildings, try a different spot or cellular if you can.",
+    "dismissOfflineBannerA11y": "Dismiss offline notice",
+    "unstableTitle": "Connection unstable",
+    "unstableBody": "The network is weak (common indoors). Some saves and updates may wait until the signal improves.",
+    "syncPausedTitle": "Live sync paused",
+    "syncPausedBody": "Kin lost the live connection to the server. Your changes should still save; other caregivers may not see updates until it reconnects."
+  },
+  "family": {
+    "inviteMember": {
+      "screenTitle": "Invite a member",
+      "subtitle": "Kin does not email them automatically—we save their email so it must match their account. After you create an invite, use Share invite so they get the full instructions.",
+      "emailPlaceholder": "Email address",
+      "roleLabel": "Role",
+      "roles": {
+        "member": "Member",
+        "viewer": "Viewer"
+      },
+      "errors": {
+        "emailRequired": "Email is required.",
+        "emailInvalid": "Enter a valid email address.",
+        "createFailed": "Failed to create invite."
+      },
+      "alerts": {
+        "shareFallback": {
+          "title": "Copied invite",
+          "body": "We could not open the share sheet. The full invite message is on your clipboard — paste it into Messages, email, or another app."
+        },
+        "mailOpenFailed": {
+          "title": "Could not open Mail",
+          "body": "Use Share invite or Copy invite message, then paste into your email app."
+        }
+      },
+      "share": {
+        "androidTitle": "Invitation to join Kin"
+      },
+      "success": {
+        "title": "Invite ready",
+        "body": "Invite for {{email}}. Their Kin account must use this same email. Tap Share invite to send the full instructions",
+        "platformNote": " (on iPhone and Android we try to open the share sheet right after you create the invite)."
+      },
+      "buttons": {
+        "share": "Share invite",
+        "email": "Email invite",
+        "copyMessage": "Copy invite message",
+        "create": "Create invite"
+      },
+      "toast": {
+        "copied": "Copied to clipboard"
+      },
+      "codeDisclosure": {
+        "needCodeOnly": "Need the code only?",
+        "hide": "Hide invite code"
+      },
+      "codeBlock": {
+        "label": "Invite code",
+        "hint": "They enter this under \"Have an invite code? Join your family\""
+      },
+      "a11y": {
+        "hideCode": "Hide invite code",
+        "showCodeOnly": "Show invite code only"
+      }
+    }
   },
   "settings": {
+    "screenTitle": "Settings",
     "sections": {
       "account": "Account",
       "family": "Family",
@@ -27,7 +182,18 @@
       "about": "About"
     },
     "profile": {
-      "displayNamePlaceholder": "Display name"
+      "displayNamePlaceholder": "Display name",
+      "avatarTitle": "Profile picture",
+      "avatarMessage": "Choose a source or remove your current photo.",
+      "avatarChoosePhoto": "Choose from library",
+      "avatarTakePhoto": "Take photo",
+      "avatarRemove": "Remove picture",
+      "avatarRemoveConfirmTitle": "Remove profile picture?",
+      "avatarRemoveConfirmMessage": "Your picture will be deleted from Kin.",
+      "avatarPermissionTitle": "Permission needed",
+      "avatarLibraryPermissionMessage": "Allow photo library access in your device settings to choose a picture.",
+      "avatarCameraPermissionMessage": "Allow camera access in your device settings to take a picture.",
+      "avatarUploadFailedTitle": "Could not update picture"
     },
     "family": {
       "nameLabel": "Family name",
@@ -44,6 +210,72 @@
       "notificationsSub": "Push notifications and reminder preferences",
       "accessibility": "Accessibility",
       "accessibilitySub": "Haptic feedback; transitions follow system Reduce Motion when available"
+    },
+    "appearance": {
+      "colorSchemeLabel": "Color scheme",
+      "options": { "light": "Light", "dark": "Dark", "system": "System" }
+    },
+    "accessibility": {
+      "haptics": {
+        "label": "Haptic feedback",
+        "sublabel": "Light vibrations when you log doses, complete tasks, expand lists, and more"
+      },
+      "footnote": "Screen transitions follow your device’s Reduce Motion setting when available."
+    },
+    "notifications": {
+      "webNotSupported": {
+        "title": "Not supported on the web",
+        "body": "Push notifications and reminder preferences are only available in the Kin mobile app for iOS and Android. Open this screen in the app to turn categories on or off."
+      },
+      "master": {
+        "label": "Push Notifications",
+        "disabledInSystem": "Disabled in system Settings"
+      },
+      "taskReminders": { "label": "Task Reminders" },
+      "taskAssigned": {
+        "label": "Task Assigned to Me",
+        "sublabel": "Push when a family member assigns a task to you"
+      },
+      "medicationAlerts": {
+        "label": "Medication Alerts",
+        "sublabel": "Dose reminders use each medication’s scheduled times (Medications → Edit). Refill alerts use quantity and alert threshold."
+      },
+      "checkinReminders": { "label": "Check-in Reminders" },
+      "eventReminders": { "label": "Event Reminders" },
+      "footnote": "If notifications are disabled at the system level, enable them in your device's Settings."
+    },
+    "dataPrivacy": {
+      "intro": "Bulk actions below apply to the whole family and are permanent. They are limited to family admins so members cannot wipe shared medical history by mistake.",
+      "notAdminNotice": "You are not a family admin. Ask an admin if you need all Visit Prep or health logs cleared.",
+      "sectionHeader": "Clear family data",
+      "rows": {
+        "clearVisitPrep": {
+          "label": "Clear all Visit Prep history",
+          "sublabel": "Removes every saved AI summary for this family (admins only)."
+        },
+        "clearHealthLogs": {
+          "label": "Clear all health logs",
+          "sublabel": "Removes every health log entry for this family (admins only)."
+        }
+      },
+      "alerts": {
+        "adminsOnly": {
+          "title": "Admins only",
+          "visitPrepBody": "Only a family admin can clear all Visit Prep history for everyone in this family.",
+          "healthBody": "Only a family admin can clear all health log entries for everyone in this family."
+        },
+        "confirmClearVisitPrep": {
+          "title": "Clear all Visit Prep history?",
+          "body": "This removes every saved AI visit summary for this family. It cannot be undone."
+        },
+        "confirmClearHealthLogs": {
+          "title": "Clear all health logs?",
+          "body": "This removes every health log entry for this family. It cannot be undone."
+        },
+        "clearedVisitPrep": "All Visit Prep summaries were removed.",
+        "clearedHealthLogs": "All health log entries were removed.",
+        "couldNotClear": "Could not clear"
+      }
     },
     "privacy": {
       "dataPrivacy": "Data & Privacy",
@@ -68,8 +300,10 @@
       "exportFailedTitle": "Export failed",
       "exportFailedMessage": "Could not export data. Please try again.",
       "deleteTitle": "Delete Account",
-      "deleteMessage": "This will remove your access to this family and sign you out. Your data will be permanently deleted within 30 days.\n\nThis cannot be undone.",
+      "deleteMessage": "This will permanently delete your account and remove your data from Kin.\n\nThis cannot be undone.",
       "deleteConfirm": "Delete My Account",
+      "deleteFailedTitle": "Delete failed",
+      "deleteFailedMessage": "Could not delete your account. Please try again.",
       "signOutTitle": "Sign Out",
       "signOutMessage": "Are you sure you want to sign out?",
       "signOutConfirm": "Sign Out"
@@ -92,20 +326,56 @@
   "auth": {
     "brand": {
       "name": "Kin",
-      "tagline": "Care, coordinated."
+      "tagline": "Care, coordinated.",
+      "markLabel": "Kin mark"
+    },
+    "password": {
+      "showA11y": "Show password",
+      "hideA11y": "Hide password"
+    },
+    "forgotPassword": {
+      "headerTitle": "Reset password",
+      "link": "Forgot password?",
+      "lead": "Enter the email for your account. We will send you a link to choose a new password.",
+      "submit": "Send reset link",
+      "sentTitle": "Check your email",
+      "sentBody": "If an account exists for that address, we sent a reset link. Open it on this device to set a new password.",
+      "errors": {
+        "emailRequired": "Please enter your email."
+      },
+      "a11y": {
+        "linkHint": "Opens the password reset screen."
+      }
+    },
+    "joinFamily": {
+      "headerTitle": "Join a family",
+      "title": "Join a family",
+      "body": "Invites are tied to your email. Sign in or create an account with the same email the organizer used when they invited you. Then you can enter your invite code on the next screen.",
+      "logIn": "Log in",
+      "signUp": "Create an account",
+      "a11y": {
+        "logInHint": "Opens sign in. After you sign in, you can enter your invite code.",
+        "signUpHint": "Opens sign up. After you create an account, you can enter your invite code."
+      }
     },
     "signIn": {
-      "title": "Welcome back",
+      "headerTitle": "Log in",
+      "title": "Log in",
       "email": "Email",
       "password": "Password",
       "emailPlaceholder": "you@example.com",
       "passwordPlaceholder": "••••••••",
       "submit": "Sign In",
       "noAccount": "Don't have an account? ",
-      "create": "Create one"
+      "create": "Create one",
+      "a11y": {
+        "submitHint": "Signs you in with the email and password you entered.",
+        "createLinkHint": "Opens the screen to create a new account."
+      }
     },
     "signUp": {
-      "createTitle": "Create your account",
+      "headerTitle": "Create an account",
+      "createTitle": "Create an account",
       "step1of2": "Step 1 of 2",
       "fullName": "Full Name",
       "namePlaceholder": "Jane Smith",
@@ -121,18 +391,55 @@
       "hasAccount": "Already have an account? ",
       "signInLink": "Sign in",
       "successTitle": "Check your email",
-      "successDesc": "We sent a confirmation link to {{email}}. Open it to activate your account. If nothing arrives within a few minutes, check spam or Promotions.",
+      "successBeforeEmail": "We sent a confirmation link to ",
+      "successAfterEmail": ". Open it to activate your account. If nothing arrives within a few minutes, check spam or Promotions.",
       "goSignIn": "Go to Sign In",
+      "a11y": {
+        "continueHint": "Goes to the next step with the details you entered.",
+        "createAccountHint": "Creates your Kin account and sends a confirmation email.",
+        "signInLinkHint": "Returns to the sign in screen.",
+        "goSignInHint": "Opens the sign in screen to enter your email.",
+        "editDetailsHint": "Returns to the first step to change your details.",
+        "successIconLabel": "Email confirmation",
+        "legalCheckbox": "Agree to terms and privacy policy"
+      },
       "errors": {
         "allFields": "Please fill in all fields.",
         "passwordLength": "Password must be at least 8 characters.",
-        "duplicateEmail": "That email already has an Auth account. Try Sign in, or in Supabase delete the user under Authentication → Users (not only public tables like profiles)."
+        "duplicateEmail": "That email already has an Auth account. Try Sign in, or in Supabase delete the user under Authentication → Users (not only public tables like profiles).",
+        "legalRequired": "Please agree to the Terms and Privacy Policy to continue."
       }
     },
     "welcome": {
+      "hubTitle": "Welcome to Kin",
+      "hubTagline": "Care for your family, coordinated in one calm place.",
+      "legalPrefix": "I agree to the ",
+      "termsLink": "Terms",
+      "legalMid": " and ",
+      "privacyLink": "Privacy Policy",
+      "legalSuffix": ".",
+      "logIn": "Log in",
+      "signUp": "Sign up",
+      "joinFamily": "Join a family",
+      "continueWithEmail": "Continue with email",
+      "or": "or",
+      "learnMore": "Learn more",
+      "back": "Back",
       "skip": "Skip",
       "next": "Next",
       "getStarted": "Get started",
+      "a11y": {
+        "backHint": "Go to the previous intro slide.",
+        "skipHint": "Dismiss the intro and continue to sign in.",
+        "skipPostAuthHint": "Skip the tour and open the app.",
+        "legalCheckbox": "Agree to terms and privacy policy before creating an account.",
+        "logInHint": "Opens sign in.",
+        "signUpHint": "Opens sign up after you agree to terms and privacy.",
+        "joinFamilyHint": "Explains how to join with an invite, then sign in or sign up.",
+        "learnMoreHint": "See a short tour of what Kin does.",
+        "getStartedHint": "Continue to sign in or create an account.",
+        "nextHint": "Go to slide {{next}} of {{total}}."
+      },
       "slide1Headline": "Track care.",
       "slide1Body": "Medications, tasks, and appointments in one calm place.",
       "slide2Headline": "Share updates.",
@@ -140,6 +447,29 @@
       "slide3Headline": "Stay aligned.",
       "slide3Body": "One shared space for family and caregivers—no group chat chaos."
     }
+    ,
+    "postAuthOnboarding": {
+      "icons": {
+        "careTracking": "Care tracking",
+        "familyCommunication": "Family communication",
+        "sharedFamilySpace": "Shared family space"
+      }
+    }
+  },
+  "doctors": {
+    "linkedMedsLabel": "Meds",
+    "menu": { "scheduleVisit": "Schedule Visit" },
+    "draft": {
+      "visitTitle": "Visit: {{name}}",
+      "fallbackTitle": "Doctor visit"
+    },
+    "errors": { "deleteFailedTitle": "Could not delete doctor" },
+    "empty": {
+      "title": "No doctors yet",
+      "message": "Save names, specialties, contact info, and next visits. Link medications so everyone knows who prescribes what.",
+      "action": "Add a doctor"
+    },
+    "a11y": { "doctorFallback": "Doctor" }
   },
   "home": {
     "caringFor": "Caring for {{name}}",
@@ -172,6 +502,285 @@
       "documents": { "label": "Documents", "desc": "Medical & legal files" },
       "notes": { "label": "Notes", "desc": "Shared family updates" },
       "members": { "label": "Members", "desc": "Family & caregivers" }
+    },
+    "dashboardSummary": {
+      "common": {
+        "log": "Log"
+      },
+      "todayAtAGlance": {
+        "title": "Today at a Glance"
+      },
+      "timeAgo": {
+        "justNow": "just now",
+        "hoursAgo_one": "{{count}}h ago",
+        "hoursAgo_other": "{{count}}h ago",
+        "daysAgo_one": "{{count}}d ago",
+        "daysAgo_other": "{{count}}d ago"
+      },
+      "checkIn": {
+        "question": "How is {{name}} doing today?",
+        "moodSummary": {
+          "great": "Doing great today!",
+          "good": "Having a good day",
+          "okay": "Getting through the day",
+          "concerning": "Having some concerns today",
+          "emergency": "Needs immediate attention"
+        }
+      },
+      "medicationsToday": {
+        "title": "Medications Today",
+        "noneTracked": "No medications tracked",
+        "allDosesLogged": "All doses logged",
+        "dosesRemaining": "{{remaining}} of {{total}} doses remaining",
+        "chooseBelow": "Choose a medication below to log a dose",
+        "hideMedications": "Hide medications",
+        "showMedicationsToLog_one": "Show {{count}} medication to log",
+        "showMedicationsToLog_other": "Show {{count}} medications to log"
+      },
+      "tasks": {
+        "allCaughtUp": "All caught up",
+        "overdueAndOpen": "{{overdue}} overdue · {{open}} open",
+        "open_one": "{{count}} open",
+        "open_other": "{{count}} open",
+        "chooseBelow": "Choose a task below to mark complete",
+        "overduePill": "Overdue",
+        "hideTasks": "Hide tasks",
+        "showTasksToComplete_one": "Show {{count}} task to complete",
+        "showTasksToComplete_other": "Show {{count}} tasks to complete",
+        "dueOn": "Due {{date}}"
+      },
+      "nextEvent": {
+        "title": "Next Event",
+        "none": "No upcoming events"
+      },
+      "doctors": {
+        "emptyPrompt": "Add contacts, specialty, and linked meds",
+        "nextVisitPrefix": "Next visit ·",
+        "onFileTapToAddNextVisit": "{{count}} on file — tap to add next visit"
+      },
+      "todaysCheckIn": {
+        "title": "Today's Check-In"
+      }
+    }
+  },
+  "visitPrep": {
+    "screenTitle": "Visit Prep",
+    "promo": {
+      "pillLabel": "AI Report",
+      "a11yCollapsed": "AI Report",
+      "a11yExpandedSummary": "Visit Prep summary",
+      "a11yCollapsedHint": "Expands the Visit Prep summary. Activate again after expanding to open Visit Prep.",
+      "a11yExpandedHint": "Opens the Visit Prep screen.",
+      "a11yHideSummary": "Hide visit prep summary",
+      "badge": "AI",
+      "eyebrow": "Visit Prep",
+      "heroTitle": "Your doctor-ready briefing",
+      "heroSub": "Summarize meds, check-ins, tasks, and notes into one clear visit handoff."
+    },
+    "tabs": {
+      "summary": "Summary",
+      "history": "History"
+    },
+    "introFull": "Drafts a visit-prep note from <0>{{name}}</0>'s last 30 days of health logs and current medications. Review for accuracy and confirm with a clinician. Each run is saved under History.",
+    "introTitle": "Visit Prep (AI-generated draft)",
+    "generateCta": "Generate Visit Summary",
+    "analyzing": "Analyzing health data…",
+    "generationTimeout": "This is taking longer than expected. Check your connection and try again.",
+    "generationStalled": "We’re not receiving updates. Check your connection and try again.",
+    "authTimeout": "We couldn’t confirm your session. Please sign out and sign back in, then try again.",
+    "loadingHistory": "Loading history…",
+    "historyLoadError": "We couldn’t load your history. Please try again.",
+    "emptyHistoryTitle": "No saved summaries yet",
+    "emptyHistoryMsg": "Generate a visit summary to save it here automatically.",
+    "goToSummary": "Go to Summary",
+    "generatedPrefix": "Generated {{date}}",
+    "copy": "Copy",
+    "refresh": "Refresh",
+    "viewPlans": "View plans",
+    "tryAgain": "Try Again",
+    "allSummaries": "All summaries",
+    "tapToReadFull": "Tap to read full summary",
+    "a11ySummaryOptions": "Summary options",
+    "a11yOpenSummary": "Open summary",
+    "toastCopied": "Copied to clipboard",
+    "toastNothingToExport": "Nothing to export",
+    "toastCopiedBrowser": "Copied (browser share not available)",
+    "toastShareFallback": "Share unavailable — copied to clipboard instead",
+    "toastShareCopyFailed": "Could not share or copy",
+    "toastSummaryDeleted": "Summary deleted",
+    "toastNameUpdated": "Name updated",
+    "toastNameCleared": "Custom name removed",
+    "shareTitle": "Visit prep summary",
+    "export": {
+      "line1": "AI-GENERATED VISIT PREP (INFORMATIONAL ONLY — NOT MEDICAL ADVICE)",
+      "line2": "Verify with a clinician. If you think this may be an emergency, call local emergency services."
+    },
+    "deleteConfirmTitle": "Delete this summary?",
+    "deleteConfirmMessage": "This cannot be undone.",
+    "delete": "Delete",
+    "couldNotDelete": "Could not delete",
+    "couldNotSave": "Could not save",
+    "unknownError": "Unknown error",
+    "menuTitle": "Summary",
+    "read": "Read",
+    "rename": "Rename",
+    "exportAction": "Export",
+    "cannotDeleteTitle": "Cannot delete",
+    "cannotDeleteMessage": "Only the person who generated this summary or a family admin can delete it.",
+    "renameModalTitle": "Rename summary",
+    "renameModalHint": "Optional. The generated date and time below always stay the same.",
+    "renamePlaceholder": "e.g. Dr. Chen — follow-up",
+    "troubleshoot": {
+      "postgrest": "PostgREST has not picked up visit_prep_summaries yet. Try in order:\n1) Supabase Dashboard → SQL → run the file supabase/migrations/20260421140000_visit_prep_summaries.sql (creates table, RLS policies, NOTIFY).\n2) Wait ~1 minute, then pull to refresh here.\n3) If it still fails: Dashboard → Project Settings → General → Pause project, then Resume (forces API reload).",
+      "missingRelation": "Add the visit_prep_summaries table to your Supabase database (see .claude/schema.sql), then try again."
+    }
+  },
+  "calendar": {
+    "sections": {
+      "upcoming": "Upcoming",
+      "pastEventsWithCount_one": "Past event ({{count}})",
+      "pastEventsWithCount_other": "Past events ({{count}})"
+    },
+    "empty": {
+      "title": "No events yet",
+      "message": "Add appointments and visits so reminders stay on track.",
+      "action": "Add your first event"
+    },
+    "errors": {
+      "deleteFailedTitle": "Could not delete event"
+    },
+    "a11y": {
+      "pastEventsLabel_one": "Past events, {{count}} item",
+      "pastEventsLabel_other": "Past events, {{count}} items",
+      "eventFallback": "Calendar event"
+    },
+    "addEvent": {
+      "titleNew": "New Event",
+      "titleEdit": "Edit Event",
+      "fields": {
+        "titleRequired": "Title *",
+        "date": "Date",
+        "includeTime": "Include Time",
+        "location": "Location",
+        "notes": "Notes"
+      },
+      "placeholders": {
+        "title": "e.g. Doctor appointment",
+        "location": "e.g. St. Mary's Hospital",
+        "notes": "Optional notes…"
+      },
+      "errors": {
+        "titleRequired": "Event title is required.",
+        "saveFailed": "Could not save event. {{message}}"
+      },
+      "alerts": {
+        "sessionExpired": {
+          "title": "Session expired",
+          "body": "Please sign in again to add an event."
+        }
+      },
+      "a11y": {
+        "titleInput": "Event title"
+      }
+    }
+  },
+  "health": {
+    "filters": {
+      "all": "All",
+      "symptoms": "Symptoms",
+      "vitals": "Vitals",
+      "mood": "Mood",
+      "notes": "Notes"
+    },
+    "empty": {
+      "all": {
+        "title": "No entries yet",
+        "message": "Log symptoms, vitals, mood, or notes to spot patterns over time."
+      },
+      "symptoms": {
+        "title": "No symptoms yet",
+        "message": "Nothing logged here yet. Add a symptom when something changes."
+      },
+      "vitals": {
+        "title": "No vitals yet",
+        "message": "Nothing logged here yet. Add a vital when you have a reading."
+      },
+      "mood": {
+        "title": "No mood entries yet",
+        "message": "Nothing logged here yet. Capture how the day felt."
+      },
+      "notes": {
+        "title": "No notes yet",
+        "message": "Nothing logged here yet. Jot a quick note for the team."
+      },
+      "actions": {
+        "first": "Add your first entry",
+        "add": "Add entry"
+      }
+    },
+    "errors": {
+      "deleteFailedTitle": "Could not delete entry"
+    },
+    "a11y": {
+      "viewPhoto": "View photo",
+      "addPhoto": "Add photo",
+      "changePhoto": "Change photo",
+      "entryOptions": "Entry options",
+      "entryFallback": "Health log entry",
+      "closePhoto": "Close photo"
+    }
+  },
+  "documents": {
+    "filters": { "all": "All" },
+    "categories": {
+      "medical": "Medical",
+      "legal": "Legal",
+      "insurance": "Insurance",
+      "general": "General"
+    },
+    "empty": {
+      "all": {
+        "title": "No documents yet",
+        "message": "Store medical, legal, and insurance files in one secure place.",
+        "action": "Upload your first document"
+      },
+      "filtered": {
+        "title": "No {{category}} documents yet",
+        "message": "Nothing in {{category}} yet. Upload a file to add it here.",
+        "action": "Upload a document"
+      }
+    },
+    "errors": {
+      "openFailedTitle": "Could not open document",
+      "noAppBody": "No app available to open this file type.",
+      "deleteFailedTitle": "Could not delete document"
+    },
+    "a11y": {
+      "documentLabel": "Document: {{name}}",
+      "documentLabelNoName": "Document"
+    }
+  },
+  "medications": {
+    "detail": {
+      "prescribedBy": "Prescribed by",
+      "notLinked": "Not linked",
+      "openDoctorsHint": "Open Doctors to link this medication",
+      "openDoctorsA11y": "Prescribed by: not linked. Open Doctors to link.",
+      "prescriberFallbackName": "Doctor"
+    }
+  },
+  "aiHealth": {
+    "title": "AI-generated — verify before relying",
+    "short": "For informational use only. Not medical advice. {{verifyLabel}}.",
+    "learnMore": "Learn more",
+    "modalTitle": "About AI health features",
+    "verifyClinician": "Confirm with a clinician",
+    "verifyPharmacistOrClinician": "Confirm with a pharmacist or clinician",
+    "details": {
+      "informationalOnly": "This feature is for informational and organizational use only.",
+      "mayBeWrong": "AI output may be incorrect or incomplete, especially with missing context.",
+      "noMedChanges": "Do not start, stop, or change medications based on this alone. {{verifyLabel}}.",
+      "emergency": "If you think this may be an emergency, call local emergency services."
     }
   }
 }

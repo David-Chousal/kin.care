@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useLayoutEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { showActionSheet } from '../../lib/actionSheet';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { useCalendarEvents, useDeleteCalendarEvent } from './hooks/useCalendarEvents';
@@ -15,23 +18,29 @@ import { useNotificationPrefs } from '../../store/notifications';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { EmptyState } from '../../components/EmptyState';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
+import { SwipeToDelete } from '../../components/SwipeToDelete';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
-function formatTime(iso: string) {
+function formatTime(iso: string, locale: string) {
   const d = new Date(iso);
   if (d.getHours() === 0 && d.getMinutes() === 0) return null;
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
 function EventCard({ event, onMenu }: { event: CalendarEvent; onMenu: () => void }) {
   const t = useTheme();
   const styles = makeStyles(t);
-  const time = formatTime(event.starts_at);
+  const formatLocale = useFormatLocaleTag();
+  const time = formatTime(event.starts_at, formatLocale);
   const d = new Date(event.starts_at);
   return (
     <View style={styles.card}>
       <View style={styles.dateBlock}>
         <Text style={styles.dateMonth}>
-          {d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+          {d.toLocaleDateString(formatLocale, { month: 'short' }).toUpperCase()}
         </Text>
         <Text style={styles.dateDay}>{d.getDate()}</Text>
         {time ? <Text style={styles.dateTime}>{time}</Text> : null}
@@ -58,9 +67,12 @@ function EventCard({ event, onMenu }: { event: CalendarEvent; onMenu: () => void
 export function CalendarScreen() {
   const t = useTheme();
   const styles = makeStyles(t);
+  const { t: tx } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const route = useRoute<RouteProp<MainStackParamList, 'Calendar'>>();
   const { data: events, isLoading, isFetching, refetch } = useCalendarEvents();
   const deleteEvent = useDeleteCalendarEvent();
+  const undoDelete = useUndoDelete();
   const notifPrefs = useNotificationPrefs();
   const [showAdd, setShowAdd] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>(undefined);
@@ -71,11 +83,18 @@ export function CalendarScreen() {
     setShowAdd(true);
   }, []);
 
+  useEffect(() => {
+    const params = route.params;
+    if (!params?.openAdd) return;
+    setEditingEvent(undefined);
+    setShowAdd(true);
+  }, [route.params?.openAdd]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => <NativeHeaderTextButton label="Add" onPress={openAdd} />,
+      headerRight: () => <NativeHeaderTextButton label={tx('common.add')} onPress={openAdd} />,
     });
-  }, [navigation, openAdd]);
+  }, [navigation, openAdd, tx]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcoming = (events ?? []).filter((e) => new Date(e.starts_at) >= today);
@@ -83,30 +102,51 @@ export function CalendarScreen() {
 
   useEffect(() => {
     if (!events || events.length === 0) return;
-    syncCalendarEventReminders(events);
+    const controller = new AbortController();
+    void syncCalendarEventReminders(events, controller.signal).catch((err) => {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      throw err;
+    });
+    return () => controller.abort();
   }, [events, notifPrefs.masterEnabled, notifPrefs.eventReminders]);
 
   const listData = [
-    ...(upcoming.length > 0 ? [{ type: 'header' as const, label: 'Upcoming' }] : []),
+    ...(upcoming.length > 0 ? [{ type: 'header' as const, label: tx('calendar.sections.upcoming') }] : []),
     ...upcoming.map((e) => ({ type: 'event' as const, event: e })),
     ...(past.length > 0 ? [{ type: 'past_section' as const, count: past.length }] : []),
   ];
   const calendarListEmpty = listData.length === 0;
 
-  function showMenu(event: CalendarEvent) {
+  const deleteWithUndo = useCallback(
+    (event: CalendarEvent) => {
+      const title = event.title?.trim() || tx('common.event');
+      undoDelete.scheduleDelete(tx('common.removed', { item: title }), () =>
+        deleteEvent.mutate(event.id, {
+          onError: (err) => {
+            Alert.alert(tx('calendar.errors.deleteFailedTitle'), errorMessageFromUnknown(err));
+          },
+        }),
+      );
+    },
+    [deleteEvent, undoDelete, tx],
+  );
+
+  const showMenu = useCallback((event: CalendarEvent) => {
     showActionSheet(
-      { options: ['Cancel', 'Edit', 'Delete'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+      {
+        options: [tx('common.cancel'), tx('common.edit'), tx('common.delete')],
+        destructiveButtonIndex: 2,
+        cancelButtonIndex: 0,
+      },
       (i) => {
-        if (i === 1) { setEditingEvent(event); setShowAdd(true); }
-        if (i === 2) {
-          Alert.alert('Delete Event', `Delete "${event.title}"?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => deleteEvent.mutate(event.id) },
-          ]);
+        if (i === 1) {
+          setEditingEvent(event);
+          setShowAdd(true);
         }
-      }
+        if (i === 2) deleteWithUndo(event);
+      },
     );
-  }
+  }, [deleteWithUndo, tx]);
 
   return (
     <View style={styles.container}>
@@ -131,9 +171,9 @@ export function CalendarScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon="calendar"
-                title="No events yet"
-                message="Add appointments and visits so reminders stay on track."
-                actionLabel="Add your first event"
+                title={tx('calendar.empty.title')}
+                message={tx('calendar.empty.message')}
+                actionLabel={tx('calendar.empty.action')}
                 onAction={openAdd}
               />
             }
@@ -148,22 +188,41 @@ export function CalendarScreen() {
                       activeOpacity={0.7}
                       accessibilityRole="button"
                       accessibilityState={{ expanded: pastExpanded }}
-                      accessibilityLabel={`Past events, ${item.count} item${item.count === 1 ? '' : 's'}`}
+                      accessibilityLabel={tx('calendar.a11y.pastEventsLabel', { count: item.count })}
                     >
-                      <Text style={styles.pastToggleLabel}>Past events ({item.count})</Text>
+                      <Text style={styles.pastToggleLabel}>
+                        {tx('calendar.sections.pastEventsWithCount', { count: item.count })}
+                      </Text>
                       <DisclosureChevron expanded={pastExpanded} color={t.textSecondary} size={18} />
                     </TouchableOpacity>
                     <Collapsible expanded={pastExpanded}>
                       <View style={{ marginTop: 10 }}>
                         {past.map((e) => (
-                          <EventCard key={e.id} event={e} onMenu={() => showMenu(e)} />
+                          <View key={e.id} style={{ marginBottom: 10 }}>
+                            <SwipeToDelete
+                              onDelete={() => deleteWithUndo(e)}
+                              accessibilityLabel={e.title?.trim() || tx('calendar.a11y.eventFallback')}
+                            >
+                              <EventCard event={e} onMenu={() => showMenu(e)} />
+                            </SwipeToDelete>
+                          </View>
                         ))}
                       </View>
                     </Collapsible>
                   </View>
                 );
               }
-              return <EventCard event={item.event!} onMenu={() => showMenu(item.event!)} />;
+              const ev = item.event!;
+              return (
+                <View style={{ marginBottom: 10 }}>
+                  <SwipeToDelete
+                    onDelete={() => deleteWithUndo(ev)}
+                    accessibilityLabel={ev.title?.trim() || tx('calendar.a11y.eventFallback')}
+                  >
+                    <EventCard event={ev} onMenu={() => showMenu(ev)} />
+                  </SwipeToDelete>
+                </View>
+              );
             }}
         />
       )}
@@ -171,7 +230,15 @@ export function CalendarScreen() {
       <AddEventSheet
         visible={showAdd}
         editing={editingEvent}
+        draft={route.params?.draft}
         onClose={() => { setShowAdd(false); setEditingEvent(undefined); }}
+      />
+
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
       />
     </View>
   );
@@ -201,7 +268,7 @@ function makeStyles(t: Theme) {
     pastToggleLabel: { fontSize: 15, fontWeight: '600', color: t.textSecondary },
     card: {
       flexDirection: 'row', backgroundColor: t.surface, borderRadius: 14,
-      overflow: 'hidden', marginBottom: 10,
+      overflow: 'hidden',
       shadowColor: t.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     },
     dateBlock: {

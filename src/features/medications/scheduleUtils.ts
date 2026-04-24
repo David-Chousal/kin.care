@@ -82,9 +82,45 @@ export function sortedUniqueDays(days: number[]): number[] {
     .sort((a, b) => a - b);
 }
 
+/** Expo weekly notification weekday is 1–7 with 1 = Sunday; app day chips use 0 = Sunday … 6 = Saturday. */
+export function appWeekdayToExpoWeekday(appDay: number): number {
+  return appDay + 1;
+}
+
 /** Parse medication times strings into minute values; skip invalid entries. */
 export function minutesFromTimeStrings(times: string[] | null | undefined, fallbackMinutes = 9 * 60): number[] {
   if (!times?.length) return [fallbackMinutes];
   const parsed = times.map((s) => parseHHMMToMinutes(s)).filter((m): m is number => m !== null);
   return parsed.length ? parsed : [fallbackMinutes];
+}
+
+/** DB columns aligned with AddMedicationSheet schedule UI. */
+export function medicationStructuredScheduleFields(
+  scheduleMode: MedicationFrequencyType,
+  timeMinutes: number[],
+  selectedDays: number[],
+): {
+  frequency_type: MedicationFrequencyType;
+  times: string[] | null;
+  times_per_day: number | null;
+  days_of_week: number[] | null;
+} {
+  if (scheduleMode === 'as_needed') {
+    return { frequency_type: 'as_needed', times: null, times_per_day: null, days_of_week: null };
+  }
+  const sortedTimes = sortUniqueHHMMFromMinutes(timeMinutes);
+  if (scheduleMode === 'daily') {
+    return {
+      frequency_type: 'daily',
+      times: sortedTimes,
+      times_per_day: sortedTimes.length,
+      days_of_week: null,
+    };
+  }
+  return {
+    frequency_type: 'weekly',
+    times: sortedTimes,
+    times_per_day: sortedTimes.length,
+    days_of_week: sortedUniqueDays(selectedDays),
+  };
 }

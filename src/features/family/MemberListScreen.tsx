@@ -4,6 +4,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Platform,
+  Alert,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { useCallback, useLayoutEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
@@ -13,8 +17,13 @@ import { useMembers } from './hooks/useMembers';
 import { useInvitations } from './hooks/useInvitations';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
 import { useTheme, spacing, radius, typography, type Theme } from '../../theme';
-import { UserRole, Profile } from '../../types';
+import type { UserRole, Profile } from '../../types';
 import type { MainStackParamList } from '../../navigation/types';
+import { useEffectiveTier } from '../../subscription/useEffectiveTier';
+import { canInviteMoreMembers } from '../../subscription/featureTierConfig';
+import { UserAvatar } from '../../components/UserAvatar';
+import { EmptyState } from '../../components/EmptyState';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
 
 function roleBadge(t: Theme): Record<UserRole, { bg: string; text: string }> {
   return {
@@ -40,15 +49,49 @@ export function MemberListScreen() {
   const ROLE_BADGE = roleBadge(t);
   const family = useFamilyStore((s) => s.family);
   const familyId = family?.id ?? '';
+  const { data: tier = 'free' } = useEffectiveTier();
 
-  const { data: members, isLoading: loadingMembers } = useMembers(familyId);
-  const { data: invitations, isLoading: loadingInvitations } = useInvitations(familyId);
+  const membersQuery = useMembers(familyId);
+  const invitationsQuery = useInvitations(familyId);
 
-  const isLoading = loadingMembers || loadingInvitations;
+  const members = membersQuery.data;
+  const invitations = invitationsQuery.data;
+  const loadingMembers = membersQuery.isLoading;
+  const loadingInvitations = invitationsQuery.isLoading;
+  const isLoading = !!familyId && (loadingMembers || loadingInvitations);
+
+  const membersListFatal =
+    !!familyId && membersQuery.isError && members === undefined;
+  const invitationsLoadError =
+    !!familyId &&
+    invitationsQuery.isError &&
+    invitations === undefined &&
+    !membersListFatal;
+
+  const isRefetching =
+    (membersQuery.isFetching || invitationsQuery.isFetching) && !isLoading;
+
+  const membersEmpty = (members ?? []).length === 0;
+
+  const refetchAll = () => {
+    void Promise.all([membersQuery.refetch(), invitationsQuery.refetch()]);
+  };
 
   const goInvite = useCallback(() => {
+    const count = (members ?? []).length;
+    if (!canInviteMoreMembers(count, tier)) {
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Family is full on Core',
+          'Subscribe in the Kin iOS or Android app to invite more than 3 family members.',
+        );
+        return;
+      }
+      navigation.navigate('Subscription', { featureId: 'unlimited_family_members' });
+      return;
+    }
     navigation.navigate('InviteMember');
-  }, [navigation]);
+  }, [navigation, members, tier]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -62,13 +105,50 @@ export function MemberListScreen() {
         <View style={[styles.centered, { paddingTop: 12 }]}>
             <ActivityIndicator size="large" color={t.accent} />
           </View>
+        ) : membersListFatal ? (
+          <View style={[styles.centered, styles.errorWrap, { paddingTop: spacing.lg }]}>
+            <View style={[styles.errorBox, { backgroundColor: t.errorSurface }]}>
+              <Text style={[styles.errorTitle, { color: t.error }]}>{"Couldn't load members"}</Text>
+              <Text style={[styles.errorBody, { color: t.textSecondary }]}>
+                {errorMessageFromUnknown(membersQuery.error)}
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryBtn, { backgroundColor: t.accent }]}
+                onPress={() => void refetchAll()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading members"
+              >
+                <Text style={styles.retryBtnText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <ScrollView
             style={styles.scroll}
             showsVerticalScrollIndicator={false}
             contentInsetAdjustmentBehavior="automatic"
-            contentContainerStyle={[styles.scrollContent, { paddingTop: spacing.lg }]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingTop: spacing.lg },
+              membersEmpty && { flexGrow: 1 },
+            ]}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={() => void refetchAll()}
+                tintColor={t.accent}
+              />
+            }
           >
+          {membersEmpty ? (
+            <EmptyState
+              icon="members"
+              title="No family members yet"
+              message="Invite relatives or caregivers so everyone can coordinate care in one place."
+              actionLabel="Invite someone"
+              onAction={goInvite}
+            />
+          ) : null}
           {(members ?? []).map((m) => {
             const badge = ROLE_BADGE[m.role];
             const displayName = m.profiles?.full_name ?? m.profiles?.email ?? 'Unknown';
@@ -76,8 +156,14 @@ export function MemberListScreen() {
 
             return (
               <View key={m.id} style={styles.row}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{abbr}</Text>
+                <View style={styles.memberAvatarSlot}>
+                  <UserAvatar
+                    size={40}
+                    avatarStoragePath={m.profiles?.avatar_url}
+                    initials={abbr}
+                    backgroundColor={t.accentLight}
+                    textColor={t.accent}
+                  />
                 </View>
                 <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
                 <View style={[styles.badge, { backgroundColor: badge.bg }]}>
@@ -87,13 +173,30 @@ export function MemberListScreen() {
             );
           })}
 
-          {(invitations ?? []).length > 0 && (
+          {invitationsLoadError ? (
+            <View style={[styles.invitesErrorBox, { backgroundColor: t.errorSurface }]}>
+              <Text style={[styles.invitesErrorTitle, { color: t.text }]}>
+                {"Couldn't load pending invites"}
+              </Text>
+              <Text style={[styles.errorBody, { color: t.textSecondary }]}>
+                {errorMessageFromUnknown(invitationsQuery.error)}
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryBtn, { backgroundColor: t.accent }]}
+                onPress={() => void invitationsQuery.refetch()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading invitations"
+              >
+                <Text style={styles.retryBtnText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (invitations ?? []).length > 0 ? (
             <>
               <Text style={styles.sectionLabel}>Pending invites</Text>
               {(invitations ?? []).map((inv) => (
                 <View key={inv.id} style={styles.row}>
-                  <View style={[styles.avatar, styles.avatarPending]}>
-                    <Text style={styles.avatarText}>?</Text>
+                  <View style={styles.pendingAvatar}>
+                    <Text style={styles.pendingAvatarText}>?</Text>
                   </View>
                   <Text style={[styles.name, styles.namePending]} numberOfLines={1}>
                     {inv.email}
@@ -106,7 +209,7 @@ export function MemberListScreen() {
                 </View>
               ))}
             </>
-          )}
+          ) : null}
 
           <View style={styles.spacer} />
         </ScrollView>
@@ -126,6 +229,47 @@ function makeStyles(t: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    errorWrap: {
+      paddingHorizontal: spacing.xl,
+    },
+    errorBox: {
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      gap: spacing.sm + 2,
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      maxWidth: 400,
+    },
+    errorTitle: {
+      ...typography.subhead,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    errorBody: {
+      ...typography.footnote,
+      textAlign: 'center',
+    },
+    invitesErrorBox: {
+      borderRadius: radius.lg,
+      padding: spacing.md + 2,
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    invitesErrorTitle: {
+      ...typography.subhead,
+      fontWeight: '600',
+    },
+    retryBtn: {
+      marginTop: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + 2,
+      borderRadius: radius.md,
+    },
+    retryBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '700',
+      fontSize: 15,
+    },
     scroll: {
       flex: 1,
     },
@@ -141,19 +285,19 @@ function makeStyles(t: Theme) {
       padding: spacing.md + 2,
       marginBottom: spacing.sm + 2,
     },
-    avatar: {
+    memberAvatarSlot: {
+      marginRight: spacing.md,
+    },
+    pendingAvatar: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: t.accentLight,
+      backgroundColor: t.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
     },
-    avatarPending: {
-      backgroundColor: t.surfaceAlt,
-    },
-    avatarText: {
+    pendingAvatarText: {
       fontSize: 14,
       fontWeight: '700',
       color: t.accent,

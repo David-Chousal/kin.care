@@ -9,6 +9,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '../../lib/haptics';
+import { useTranslation } from 'react-i18next';
 import { useTheme, type Theme, navigationTitleTextStyle, radius } from '../../theme';
 import { useResolvedScheme } from '../../lib/useResolvedScheme';
 import { getExpoGlassEffectModule } from '../../lib/expoGlassEffectOptional';
@@ -24,6 +25,7 @@ interface Props {
 
 export function VisitPrepGlassPromo({ onOpenVisitPrep }: Props) {
   const t = useTheme();
+  const { t: tx } = useTranslation();
   const resolvedScheme = useResolvedScheme();
   const styles = makeStyles(t);
   const [expanded, setExpanded] = useState(false);
@@ -160,7 +162,7 @@ export function VisitPrepGlassPromo({ onOpenVisitPrep }: Props) {
           onPress={handleCollapse}
           style={({ pressed }) => [styles.collapseTouch, pressed && styles.collapsePressed]}
           hitSlop={12}
-          accessibilityLabel="Hide visit prep summary"
+          accessibilityLabel={tx('visitPrep.promo.a11yHideSummary')}
           accessibilityRole="button"
         >
           <Icon name="close" size={16} color={t.textTertiary} />
@@ -170,12 +172,12 @@ export function VisitPrepGlassPromo({ onOpenVisitPrep }: Props) {
         onPress={handleMainPress}
         style={expanded ? styles.mainTouchExpanded : styles.mainTouchCollapsed}
         accessibilityRole="button"
-        accessibilityLabel={expanded ? 'Visit Prep summary' : 'AI Report'}
+        accessibilityLabel={expanded ? tx('visitPrep.promo.a11yExpandedSummary') : tx('visitPrep.promo.a11yCollapsed')}
         accessibilityState={{ expanded }}
         accessibilityHint={
           expanded
-            ? 'Opens the Visit Prep screen.'
-            : 'Expands the Visit Prep summary. Activate again after expanding to open Visit Prep.'
+            ? tx('visitPrep.promo.a11yExpandedHint')
+            : tx('visitPrep.promo.a11yCollapsedHint')
         }
       >
         {expanded ? (
@@ -197,13 +199,13 @@ export function VisitPrepGlassPromo({ onOpenVisitPrep }: Props) {
               <View style={styles.visitPrepHeroText}>
                 <View style={styles.visitPrepHeroTopRow}>
                   <View style={styles.visitPrepBadge}>
-                    <Text style={styles.visitPrepBadgeText}>AI</Text>
+                    <Text style={styles.visitPrepBadgeText}>{tx('visitPrep.promo.badge')}</Text>
                   </View>
-                  <Text style={styles.visitPrepHeroEyebrow}>Visit Prep</Text>
+                  <Text style={styles.visitPrepHeroEyebrow}>{tx('visitPrep.promo.eyebrow')}</Text>
                 </View>
-                <Text style={styles.visitPrepHeroTitle}>Your doctor-ready briefing</Text>
+                <Text style={styles.visitPrepHeroTitle}>{tx('visitPrep.promo.heroTitle')}</Text>
                 <Text style={styles.visitPrepHeroSub}>
-                  Summarize meds, check-ins, tasks, and notes into one clear visit handoff.
+                  {tx('visitPrep.promo.heroSub')}
                 </Text>
               </View>
               <Icon name="chevron" size={20} color={t.accent} />
@@ -212,11 +214,11 @@ export function VisitPrepGlassPromo({ onOpenVisitPrep }: Props) {
               style={[styles.pillFadeLayer, { opacity: pillFadeOut }]}
               pointerEvents="none"
             >
-              <Text style={styles.pillLabel}>AI Report</Text>
+              <Text style={styles.pillLabel}>{tx('visitPrep.promo.pillLabel')}</Text>
             </Animated.View>
           </View>
         ) : (
-          <Text style={styles.pillLabel}>AI Report</Text>
+          <Text style={styles.pillLabel}>{tx('visitPrep.promo.pillLabel')}</Text>
         )}
       </Pressable>
     </View>

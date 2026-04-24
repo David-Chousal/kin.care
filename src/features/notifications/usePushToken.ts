@@ -4,6 +4,7 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/auth';
 import { useNotificationPrefs } from '../../store/notifications';
+import { ensureAndroidNotificationChannels } from './ensureAndroidNotificationChannels';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -56,6 +57,8 @@ async function maybeRegisterToken(
 
   if (status !== 'granted' && status !== 'provisional') return;
   if (lastRegisteredUserIdRef.current === userId) return;
+
+  await ensureAndroidNotificationChannels();
 
   const tokenData = await Notifications.getExpoPushTokenAsync();
   const token = tokenData.data;

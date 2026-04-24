@@ -1,39 +1,36 @@
-import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useState, useCallback, useLayoutEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, Modal,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView,
-  Animated,
+  View, Text, TextInput, TouchableOpacity, FlatList,
+  StyleSheet, Alert,
 } from 'react-native';
 import { showActionSheet } from '../../lib/actionSheet';
-import { Swipeable } from 'react-native-gesture-handler';
+import { SwipeToDelete } from '../../components/SwipeToDelete';
 import { SkeletonList } from '../../components/SkeletonCard';
 import { hapticImpact, hapticNotification, ImpactFeedbackStyle, NotificationFeedbackType } from '../../lib/haptics';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BlurredHeaderBar } from '../../components/BlurredHeaderBar';
+import { FormSheet } from '../../components/FormSheet';
 import { Toast } from '../../components/Toast';
+import { UndoSnackbar } from '../../components/UndoSnackbar';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import { FormError } from '../../components/FormError';
 import { useAuthStore } from '../../store/auth';
 import { useFamilyStore } from '../../store/family';
 import { useCheckIns, useAddCheckIn, useDeleteCheckIn, useUpdateCheckIn } from './hooks/useCheckIns';
-import {
-  useTheme,
-  type Theme,
-  navigationTitleTextStyle,
-  spacing,
-  typography,
-  NAVIGATION_HEADER_TOOLBAR,
-  NAVIGATION_HEADER_CHROME_PAD,
-} from '../../theme';
-import { Icon } from '../../components/Icon';
+import { errorMessageFromUnknown } from '../../lib/errorMessage';
+import { useTheme, type Theme } from '../../theme';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { CheckIn, CheckInMood } from '../../types';
 import { MOODS, moodMeta } from './moods';
 import type { MainStackParamList } from '../../navigation/types';
 import { NativeHeaderTextButton } from '../../navigation/NativeHeaderTextButton';
+import { EmptyState } from '../../components/EmptyState';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 function CheckInCard({ item, onMenu }: { item: CheckIn; onMenu: () => void }) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const formatLocale = useFormatLocaleTag();
   const meta = moodMeta(item.mood);
   const d = new Date(item.created_at);
   return (
@@ -43,8 +40,8 @@ function CheckInCard({ item, onMenu }: { item: CheckIn; onMenu: () => void }) {
         <View style={{ flex: 1 }}>
           <Text style={[styles.moodLabel, { color: meta.color }]}>{meta.label}</Text>
           <Text style={styles.cardDate}>
-            {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{' '}
-            {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            {d.toLocaleDateString(formatLocale, { weekday: 'short', month: 'short', day: 'numeric' })}{' '}
+            {d.toLocaleTimeString(formatLocale, { hour: 'numeric', minute: '2-digit' })}
           </Text>
         </View>
         <TouchableOpacity onPress={onMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -54,31 +51,6 @@ function CheckInCard({ item, onMenu }: { item: CheckIn; onMenu: () => void }) {
       <Text style={styles.cardSummary}>{item.summary}</Text>
       {item.notes ? <Text style={styles.cardNotes}>{item.notes}</Text> : null}
     </View>
-  );
-}
-
-function SwipeableCheckInCard({ item, onDelete, onMenu }: { item: CheckIn; onDelete: () => void; onMenu: () => void }) {
-  const t = useTheme();
-  const styles = makeStyles(t);
-  const swipeableRef = useRef<Swipeable>(null);
-  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
-    return (
-      <Animated.View style={[styles.swipeDeleteAction, { transform: [{ translateX }] }]}>
-        <TouchableOpacity
-          style={styles.swipeDeleteBtn}
-          onPress={() => { swipeableRef.current?.close(); onDelete(); }}
-        >
-          <Icon name="trash" size={20} color={t.surface} />
-          <Text style={styles.swipeDeleteText}>Delete</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-  return (
-    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} rightThreshold={40}>
-      <CheckInCard item={item} onMenu={onMenu} />
-    </Swipeable>
   );
 }
 
@@ -99,9 +71,11 @@ function CheckInFormModal({ visible, careRecipientName, onClose, onSubmitted, ed
   const [mood, setMood] = useState<CheckInMood>('good');
   const [summary, setSummary] = useState('');
   const [notes, setNotes] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
+      setFormError(null);
       if (editing) {
         setMood(editing.mood);
         setSummary(editing.summary);
@@ -112,95 +86,113 @@ function CheckInFormModal({ visible, careRecipientName, onClose, onSubmitted, ed
     }
   }, [visible, editing?.id]);
 
-  function reset() {
-    setMood('good'); setSummary(''); setNotes('');
+  function resetFields() {
+    setMood('good');
+    setSummary('');
+    setNotes('');
+    setFormError(null);
+  }
+
+  function handleCancel() {
+    resetFields();
     onClose();
   }
 
   async function handleSubmit() {
-    if (!summary.trim()) { Alert.alert('Required', 'Please write a brief summary.'); return; }
-    hapticNotification(NotificationFeedbackType.Success);
-    if (editing) {
-      await updateCheckIn.mutateAsync({ id: editing.id, mood, summary: summary.trim(), notes: notes.trim() || undefined });
-    } else {
-      await addCheckIn.mutateAsync({ mood, summary: summary.trim(), notes: notes.trim() || undefined, submitted_by: user!.id });
+    setFormError(null);
+    if (!summary.trim()) {
+      setFormError('Please write a brief summary.');
+      return;
     }
-    reset();
-    onSubmitted();
+    if (!editing && !user) {
+      Alert.alert('Session expired', 'Please sign in again to submit a check-in.');
+      return;
+    }
+    try {
+      if (editing) {
+        await updateCheckIn.mutateAsync({
+          id: editing.id,
+          mood,
+          summary: summary.trim(),
+          notes: notes.trim() || undefined,
+        });
+      } else {
+        await addCheckIn.mutateAsync({
+          mood,
+          summary: summary.trim(),
+          notes: notes.trim() || undefined,
+          submitted_by: user!.id,
+        });
+      }
+      hapticNotification(NotificationFeedbackType.Success);
+      resetFields();
+      onClose();
+      onSubmitted();
+    } catch (err: unknown) {
+      setFormError(`Could not save check-in. ${errorMessageFromUnknown(err)}`);
+    }
   }
 
   const isPending = addCheckIn.isPending || updateCheckIn.isPending;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <KeyboardAvoidingView
-        style={styles.modalContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.dragHandle} />
-        <BlurredHeaderBar style={styles.modalHeader} contentStyle={styles.modalHeaderInner}>
-          <TouchableOpacity onPress={reset}>
-            <Text style={styles.modalCancel}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>{editing ? 'Edit Check-In' : 'New Check-In'}</Text>
-          <TouchableOpacity onPress={handleSubmit} disabled={isPending}>
-            <Text style={[styles.modalSave, isPending && styles.disabledText]}>
-              {isPending ? 'Saving…' : 'Submit'}
-            </Text>
-          </TouchableOpacity>
-        </BlurredHeaderBar>
+    <FormSheet
+      visible={visible}
+      title={editing ? 'Edit Check-In' : 'New Check-In'}
+      submitLabel="Submit"
+      isSubmitting={isPending}
+      onClose={handleCancel}
+      onSubmit={handleSubmit}
+    >
+      <Text style={styles.formLabel}>
+        How is {careRecipientName} doing today?
+      </Text>
+      <FormError message={formError} />
 
-        <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Text style={styles.formLabel}>
-            How is {careRecipientName} doing today?
-          </Text>
+      <View style={styles.moodGrid}>
+        {MOODS.map(({ key, label, mci, color }) => {
+          const active = mood === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.moodChip, active && { backgroundColor: color, borderColor: color }]}
+              onPress={() => { hapticImpact(ImpactFeedbackStyle.Light); setMood(key); }}
+            >
+              <MaterialCommunityIcons
+                name={mci as never}
+                size={20}
+                color={active ? t.surface : color}
+              />
+              <Text style={[styles.moodChipLabel, active && styles.moodChipLabelActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-          <View style={styles.moodGrid}>
-            {MOODS.map(({ key, label, mci, color }) => {
-              const active = mood === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.moodChip, active && { backgroundColor: color, borderColor: color }]}
-                  onPress={() => { hapticImpact(ImpactFeedbackStyle.Light); setMood(key); }}
-                >
-                  <MaterialCommunityIcons
-                    name={mci as never}
-                    size={20}
-                    color={active ? t.surface : color}
-                  />
-                  <Text style={[styles.moodChipLabel, active && styles.moodChipLabelActive]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      <Text style={styles.formLabel}>Summary *</Text>
+      <TextInput
+        style={[styles.input, styles.multiline]}
+        placeholder="Brief description of how they're doing…"
+        placeholderTextColor={t.textTertiary}
+        value={summary}
+        onChangeText={(v) => { setSummary(v); setFormError(null); }}
+        multiline
+        numberOfLines={4}
+      />
 
-          <Text style={styles.formLabel}>Summary *</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Brief description of how they're doing…"
-            placeholderTextColor={t.textTertiary}
-            value={summary}
-            onChangeText={setSummary}
-            multiline
-            numberOfLines={4}
-          />
-
-          <Text style={styles.formLabel}>Additional Notes</Text>
-          <TextInput
-            style={[styles.input, styles.multilineSmall]}
-            placeholder="Any specific observations, concerns, or updates…"
-            placeholderTextColor={t.textTertiary}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
+      <Text style={styles.formLabel}>Additional Notes</Text>
+      <TextInput
+        style={[styles.input, styles.multilineSmall]}
+        placeholder="Any specific observations, concerns, or updates…"
+        placeholderTextColor={t.textTertiary}
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        numberOfLines={3}
+      />
+    </FormSheet>
   );
 }
 
@@ -211,6 +203,7 @@ export function CheckInScreen() {
   const family = useFamilyStore((s) => s.family);
   const { data: checkins, isLoading, isFetching, refetch } = useCheckIns();
   const deleteCheckIn = useDeleteCheckIn();
+  const undoDelete = useUndoDelete();
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<CheckIn | undefined>(undefined);
   const [toast, setToast] = useState({ visible: false, message: '' });
@@ -237,10 +230,13 @@ export function CheckInScreen() {
   }
 
   function confirmDelete(item: CheckIn) {
-    Alert.alert('Delete Check-In', 'Delete this check-in? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteCheckIn.mutate(item.id) },
-    ]);
+    undoDelete.scheduleDelete('Check-in removed', () =>
+      deleteCheckIn.mutate(item.id, {
+        onError: (err) => {
+          setToast({ visible: true, message: `Could not delete check-in. ${errorMessageFromUnknown(err)}` });
+        },
+      }),
+    );
   }
 
   return (
@@ -255,22 +251,29 @@ export function CheckInScreen() {
           data={checkins ?? []}
           keyExtractor={(c) => c.id}
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.list, { paddingTop: 12 }]}
+          contentContainerStyle={[
+            styles.list,
+            { paddingTop: 12 },
+            (checkins?.length ?? 0) === 0 && { flexGrow: 1 },
+          ]}
           refreshing={isFetching && !isLoading}
           onRefresh={refetch}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Icon name="checkin" size={48} color={t.borderLight} />
-                <Text style={styles.emptyTitle}>No check-ins yet</Text>
-                <Text style={styles.emptyDesc}>Tap New to submit a daily status update.</Text>
-              </View>
-            }
+          ListEmptyComponent={(
+            <EmptyState
+              icon="checkin"
+              title="No check-ins yet"
+              message="Share a daily status update so the family stays on the same page."
+              actionLabel="New check-in"
+              onAction={openNew}
+            />
+          )}
             renderItem={({ item }) => (
-              <SwipeableCheckInCard
-                item={item}
+              <SwipeToDelete
                 onDelete={() => confirmDelete(item)}
-                onMenu={() => showMenu(item)}
-              />
+                accessibilityLabel={item.summary?.trim() || 'Check-in'}
+              >
+                <CheckInCard item={item} onMenu={() => showMenu(item)} />
+              </SwipeToDelete>
             )}
         />
       )}
@@ -287,6 +290,12 @@ export function CheckInScreen() {
         }}
       />
       <Toast message={toast.message} visible={toast.visible} onHide={() => setToast({ visible: false, message: '' })} />
+      <UndoSnackbar
+        message={undoDelete.message}
+        visible={undoDelete.visible}
+        onUndo={undoDelete.undo}
+        onSwipeDismiss={undoDelete.dismissAndCommit}
+      />
     </View>
   );
 }
@@ -294,24 +303,6 @@ export function CheckInScreen() {
 function makeStyles(t: Theme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
-    modalContainer: { flex: 1, backgroundColor: t.bg },
-    dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: t.borderLight, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
-    modalHeader: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.sm,
-      paddingBottom: NAVIGATION_HEADER_CHROME_PAD,
-    },
-    modalHeaderInner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      minHeight: NAVIGATION_HEADER_TOOLBAR,
-    },
-    modalTitle: { ...navigationTitleTextStyle(t), flex: 1, textAlign: 'center' },
-    modalCancel: { ...typography.callout, color: t.textSecondary, minWidth: 56 },
-    modalSave: { ...typography.callout, color: t.accent, fontWeight: '700', minWidth: 56, textAlign: 'right' },
-    disabledText: { opacity: 0.4 },
-    form: { padding: 20, paddingBottom: 48 },
     formLabel: { fontSize: 14, fontWeight: '600', color: t.textSecondary, marginTop: 20, marginBottom: 10 },
     moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     moodChip: {
@@ -329,9 +320,6 @@ function makeStyles(t: Theme) {
     multiline: { height: 100, textAlignVertical: 'top' },
     multilineSmall: { height: 72, textAlignVertical: 'top' },
     list: { padding: 16, gap: 12, paddingBottom: 40 },
-    emptyState: { alignItems: 'center', paddingTop: 60, gap: 8 },
-    emptyTitle: { fontSize: 17, fontWeight: '600', color: t.text },
-    emptyDesc: { fontSize: 14, color: t.textTertiary, textAlign: 'center', paddingHorizontal: 40 },
     card: {
       backgroundColor: t.surface, borderRadius: 14, padding: 14, borderLeftWidth: 4,
       shadowColor: t.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
@@ -343,11 +331,5 @@ function makeStyles(t: Theme) {
     cardSummary: { fontSize: 14, color: t.text, lineHeight: 20 },
     cardNotes: { fontSize: 13, color: t.textSecondary, lineHeight: 18 },
     menuDots: { fontSize: 18, color: t.textTertiary },
-    swipeDeleteAction: {
-      width: 80, justifyContent: 'center', alignItems: 'center',
-      backgroundColor: t.error, borderRadius: 14,
-    },
-    swipeDeleteBtn: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', gap: 4 },
-    swipeDeleteText: { color: t.surface, fontWeight: '700', fontSize: 12, textAlign: 'center' },
   });
 }

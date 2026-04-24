@@ -43,6 +43,27 @@ export function useUpdateTask(familyId: string | null) {
       const { error } = await supabase.from('tasks').update(patch).eq('id', id);
       if (error) throw error;
     },
+    onMutate: async ({ id, title, description, due_date, assigned_to }) => {
+      const key = ['tasks', familyId] as const;
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<Task[]>(key);
+      queryClient.setQueryData<Task[]>(key, (old) =>
+        old?.map((t) => {
+          if (t.id !== id) return t;
+          return {
+            ...t,
+            title,
+            ...(description !== undefined ? { description: description || null } : {}),
+            ...(due_date !== undefined ? { due_date: due_date || null } : {}),
+            ...(assigned_to !== undefined ? { assigned_to } : {}),
+          };
+        }) ?? []
+      );
+      return { prev, key };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev !== undefined && ctx.key) queryClient.setQueryData(ctx.key, ctx.prev);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', familyId] });
     },
@@ -55,6 +76,16 @@ export function useDeleteTask(familyId: string | null) {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('tasks').delete().eq('id', id);
       if (error) throw error;
+    },
+    onMutate: async (id) => {
+      const key = ['tasks', familyId] as const;
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<Task[]>(key);
+      queryClient.setQueryData<Task[]>(key, (old) => old?.filter((t) => t.id !== id) ?? []);
+      return { prev, key };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev !== undefined && ctx.key) queryClient.setQueryData(ctx.key, ctx.prev);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', familyId] });

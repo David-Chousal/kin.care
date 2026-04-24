@@ -2,9 +2,10 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-const SUPABASE_URL = 'https://toowcdabumseydziiodz.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvb3djZGFidW1zZXlkemlpb2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTQyNzUsImV4cCI6MjA5MjAzMDI3NX0.d962DRPOY-uYNwwXDC1K8RRBNntA0XS6xLe7MQWNz54';
+import { getExpoPublicEnv } from './expoPublicEnv';
+
+const { supabaseUrl, supabaseAnonKey } = getExpoPublicEnv();
+export const SUPABASE_URL = supabaseUrl;
 
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
@@ -12,7 +13,7 @@ const ExpoSecureStoreAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(SUPABASE_URL, supabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
@@ -20,3 +21,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+/** Current access token from the Supabase client (SecureStore-backed). Prefer this over Zustand for Edge calls so the token cannot lag behind refresh. */
+export async function getSupabaseAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}

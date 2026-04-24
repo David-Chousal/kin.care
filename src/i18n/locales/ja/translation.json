@@ -13,8 +13,159 @@
     "optionJapanese": "日本語",
     "optionChineseSimplified": "中国語（簡体字）"
   },
-  "common": { "cancel": "キャンセル", "save": "保存", "edit": "編集" },
+  "common": {
+    "cancel": "キャンセル",
+    "save": "保存",
+    "edit": "編集",
+    "delete": "削除",
+    "done": "完了",
+    "event": "予定",
+    "entry": "記録",
+    "document": "書類",
+    "open": "開く",
+    "upload": "アップロード",
+    "doctor": "医師",
+    "removed": "削除しました: {{item}}",
+    "pleaseTryAgain": "もう一度お試しください。",
+    "clearAll": "すべて削除",
+    "a11y": {
+      "swipeToRevealDeleteHint": "左右にスワイプして削除。"
+    },
+    "errors": { "genericTryAgain": "問題が発生しました。もう一度お試しください。" }
+  },
+  "subscription": { "screenTitle": "サブスクリプション" },
+  "medications": { "detail": { "screenTitle": "薬" } },
+  "calendar": {
+    "sections": {
+      "upcoming": "今後の予定",
+      "pastEventsWithCount_one": "過去の予定（{{count}}）",
+      "pastEventsWithCount_other": "過去の予定（{{count}}）"
+    },
+    "empty": {
+      "title": "予定はまだありません",
+      "message": "通院や予定を追加して、リマインダーを見逃さないようにしましょう。",
+      "action": "最初の予定を追加"
+    },
+    "errors": { "deleteFailedTitle": "予定を削除できませんでした" },
+    "a11y": {
+      "pastEventsLabel_one": "過去の予定、{{count}} 件",
+      "pastEventsLabel_other": "過去の予定、{{count}} 件",
+      "eventFallback": "カレンダーの予定"
+    },
+    "addEvent": {
+      "titleNew": "新しい予定",
+      "titleEdit": "予定を編集",
+      "fields": {
+        "titleRequired": "タイトル *",
+        "date": "日付",
+        "includeTime": "時間を含める",
+        "location": "場所",
+        "notes": "メモ"
+      },
+      "placeholders": {
+        "title": "例：診察の予約",
+        "location": "例：St. Mary's Hospital",
+        "notes": "任意のメモ…"
+      },
+      "errors": {
+        "titleRequired": "予定のタイトルを入力してください。",
+        "saveFailed": "予定を保存できませんでした。{{message}}"
+      },
+      "alerts": {
+        "sessionExpired": {
+          "title": "セッションの有効期限が切れました",
+          "body": "予定を追加するには、もう一度サインインしてください。"
+        }
+      },
+      "a11y": { "titleInput": "予定のタイトル" }
+    }
+  },
+  "health": {
+    "filters": {
+      "all": "すべて",
+      "symptoms": "症状",
+      "vitals": "バイタル",
+      "mood": "気分",
+      "notes": "メモ"
+    },
+    "empty": {
+      "all": {
+        "title": "まだ記録がありません",
+        "message": "症状、バイタル、気分、メモを記録して、時間とともに傾向を把握しましょう。"
+      },
+      "symptoms": {
+        "title": "症状はまだありません",
+        "message": "まだ記録がありません。変化があれば症状を追加してください。"
+      },
+      "vitals": {
+        "title": "バイタルはまだありません",
+        "message": "まだ記録がありません。測定値があれば追加してください。"
+      },
+      "mood": {
+        "title": "気分の記録はまだありません",
+        "message": "まだ記録がありません。1日の感じ方を記録しましょう。"
+      },
+      "notes": {
+        "title": "メモはまだありません",
+        "message": "まだ記録がありません。チーム向けに短いメモを残しましょう。"
+      },
+      "actions": {
+        "first": "最初の記録を追加",
+        "add": "記録を追加"
+      }
+    },
+    "errors": { "deleteFailedTitle": "記録を削除できませんでした" },
+    "a11y": {
+      "viewPhoto": "写真を見る",
+      "addPhoto": "写真を追加",
+      "changePhoto": "写真を変更",
+      "entryOptions": "記録のオプション",
+      "entryFallback": "健康ログの記録",
+      "closePhoto": "写真を閉じる"
+    }
+  },
+  "documents": {
+    "filters": { "all": "すべて" },
+    "categories": {
+      "medical": "医療",
+      "legal": "法務",
+      "insurance": "保険",
+      "general": "一般"
+    },
+    "empty": {
+      "all": {
+        "title": "書類はまだありません",
+        "message": "医療・法務・保険の書類を安全な場所にまとめて保管できます。",
+        "action": "最初の書類をアップロード"
+      },
+      "filtered": {
+        "title": "{{category}}の書類はまだありません",
+        "message": "{{category}}にはまだ何もありません。ファイルをアップロードして追加しましょう。",
+        "action": "書類をアップロード"
+      }
+    },
+    "errors": {
+      "openFailedTitle": "書類を開けませんでした",
+      "noAppBody": "この種類のファイルを開くアプリが見つかりません。",
+      "deleteFailedTitle": "書類を削除できませんでした"
+    },
+    "a11y": {
+      "documentLabel": "書類: {{name}}",
+      "documentLabelNoName": "書類"
+    }
+  },
+  "connectivity": {
+    "offlineTitle": "オフラインです",
+    "offlineBody": "直近まで読み込んだ画面は引き続き使えます。編集内容は端末に反映され、オンライン復帰後に同期されます。",
+    "dismissOfflineBannerA11y": "オフライン表示を閉じる",
+    "unstableTitle": "接続が不安定です",
+    "unstableBody": "電波や Wi‑Fi が弱い可能性があります。回復するまで一部の操作は保存されないことがあります。",
+    "syncPausedTitle": "ライブ同期が一時停止",
+    "syncPausedBody": "サーバーとのライブ接続が切れました。変更は保存されることが多いですが、他のケア参加者には再接続まで反映されない場合があります。"
+  },
+  "family": { "inviteMember": { "screenTitle": "メンバーを招待" } },
   "settings": {
+    "screenTitle": "設定",
     "sections": {
       "account": "アカウント",
       "family": "家族",
@@ -22,7 +173,20 @@
       "privacy": "プライバシーとデータ",
       "about": "について"
     },
-    "profile": { "displayNamePlaceholder": "表示名" },
+    "profile": {
+      "displayNamePlaceholder": "表示名",
+      "avatarTitle": "プロフィール写真",
+      "avatarMessage": "取得元を選ぶか、現在の写真を削除します。",
+      "avatarChoosePhoto": "ライブラリから選ぶ",
+      "avatarTakePhoto": "写真を撮る",
+      "avatarRemove": "写真を削除",
+      "avatarRemoveConfirmTitle": "プロフィール写真を削除しますか？",
+      "avatarRemoveConfirmMessage": "写真は Kin から削除されます。",
+      "avatarPermissionTitle": "許可が必要です",
+      "avatarLibraryPermissionMessage": "写真を選ぶには、端末の設定でフォトライブラリへのアクセスを許可してください。",
+      "avatarCameraPermissionMessage": "撮影するには、端末の設定でカメラへのアクセスを許可してください。",
+      "avatarUploadFailedTitle": "写真を更新できませんでした"
+    },
     "family": {
       "nameLabel": "家族名",
       "namePlaceholder": "家族名",
@@ -38,6 +202,72 @@
       "notificationsSub": "プッシュ通知とリマインダー",
       "accessibility": "アクセシビリティ",
       "accessibilitySub": "触覚フィードバック。利用可能なら「動きを減らす」に従います"
+    },
+    "appearance": {
+      "colorSchemeLabel": "カラースキーム",
+      "options": { "light": "ライト", "dark": "ダーク", "system": "システム" }
+    },
+    "accessibility": {
+      "haptics": {
+        "label": "触覚フィードバック",
+        "sublabel": "服薬の記録、タスク完了、リストの展開などで軽い振動を行います"
+      },
+      "footnote": "画面遷移は、利用可能な場合は端末の「動きを減らす」設定に従います。"
+    },
+    "notifications": {
+      "webNotSupported": {
+        "title": "Web では利用できません",
+        "body": "プッシュ通知とリマインダーの設定は、iOS/Android の Kin モバイルアプリでのみ利用できます。カテゴリのオン/オフはアプリでこの画面を開いてください。"
+      },
+      "master": {
+        "label": "プッシュ通知",
+        "disabledInSystem": "端末の設定で無効になっています"
+      },
+      "taskReminders": { "label": "タスクリマインダー" },
+      "taskAssigned": {
+        "label": "自分に割り当てられたタスク",
+        "sublabel": "家族があなたにタスクを割り当てたときに通知します"
+      },
+      "medicationAlerts": {
+        "label": "服薬アラート",
+        "sublabel": "服薬リマインダーは各薬の予定時刻（薬 → 編集）を使用します。補充アラートは数量としきい値を使用します。"
+      },
+      "checkinReminders": { "label": "チェックインのリマインダー" },
+      "eventReminders": { "label": "予定のリマインダー" },
+      "footnote": "通知がシステムで無効な場合は、端末の設定で有効にしてください。"
+    },
+    "dataPrivacy": {
+      "intro": "以下の一括操作は家族全体に適用され、元に戻せません。共有の医療履歴を誤って消さないよう、家族管理者のみに制限されています。",
+      "notAdminNotice": "あなたは家族管理者ではありません。Visit Prep や健康ログをすべて削除する必要がある場合は、管理者に依頼してください。",
+      "sectionHeader": "家族データを消去",
+      "rows": {
+        "clearVisitPrep": {
+          "label": "Visit Prep の履歴をすべて削除",
+          "sublabel": "この家族の保存済み AI 要約をすべて削除します（管理者のみ）。"
+        },
+        "clearHealthLogs": {
+          "label": "健康ログをすべて削除",
+          "sublabel": "この家族の健康ログの記録をすべて削除します（管理者のみ）。"
+        }
+      },
+      "alerts": {
+        "adminsOnly": {
+          "title": "管理者のみ",
+          "visitPrepBody": "この家族の全員分の Visit Prep 履歴を削除できるのは、家族管理者のみです。",
+          "healthBody": "この家族の全員分の健康ログを削除できるのは、家族管理者のみです。"
+        },
+        "confirmClearVisitPrep": {
+          "title": "Visit Prep の履歴をすべて削除しますか？",
+          "body": "この家族の保存済み AI 訪問要約をすべて削除します。元に戻せません。"
+        },
+        "confirmClearHealthLogs": {
+          "title": "健康ログをすべて削除しますか？",
+          "body": "この家族の健康ログの記録をすべて削除します。元に戻せません。"
+        },
+        "clearedVisitPrep": "Visit Prep の要約をすべて削除しました。",
+        "clearedHealthLogs": "健康ログの記録をすべて削除しました。",
+        "couldNotClear": "削除できませんでした"
+      }
     },
     "privacy": {
       "dataPrivacy": "データとプライバシー",
@@ -62,8 +292,10 @@
       "exportFailedTitle": "書き出しに失敗しました",
       "exportFailedMessage": "データを書き出せませんでした。もう一度お試しください。",
       "deleteTitle": "アカウントを削除",
-      "deleteMessage": "この家族へのアクセスがなくなり、サインアウトします。データは30日以内に完全に削除されます。\n\n取り消せません。",
+      "deleteMessage": "アカウントは完全に削除され、Kin からあなたのデータが消去されます。\n\n取り消せません。",
       "deleteConfirm": "アカウントを削除する",
+      "deleteFailedTitle": "削除に失敗しました",
+      "deleteFailedMessage": "アカウントを削除できませんでした。もう一度お試しください。",
       "signOutTitle": "サインアウト",
       "signOutMessage": "サインアウトしますか？",
       "signOutConfirm": "サインアウト"
@@ -84,18 +316,53 @@
     }
   },
   "auth": {
-    "brand": { "name": "Kin", "tagline": "ケアを、ひとつに。" },
+    "brand": { "name": "Kin", "tagline": "ケアを、ひとつに。", "markLabel": "Kinのマーク" },
+    "password": {
+      "showA11y": "パスワードを表示",
+      "hideA11y": "パスワードを隠す"
+    },
+    "forgotPassword": {
+      "headerTitle": "パスワードを再設定",
+      "link": "パスワードをお忘れですか？",
+      "lead": "アカウントのメールアドレスを入力してください。新しいパスワードを設定するためのリンクをお送りします。",
+      "submit": "リンクを送信",
+      "sentTitle": "メールを確認してください",
+      "sentBody": "そのアドレスにアカウントがある場合、再設定用のリンクを送信しました。この端末で開いて新しいパスワードを設定してください。",
+      "errors": {
+        "emailRequired": "メールアドレスを入力してください。"
+      },
+      "a11y": {
+        "linkHint": "パスワード再設定画面を開きます。"
+      }
+    },
+    "joinFamily": {
+      "headerTitle": "家族に参加",
+      "title": "家族に参加",
+      "body": "招待はメールアドレスと紐づいています。招待した人が使ったのと同じメールでサインインするか、アカウントを作成してください。その後、次の画面で招待コードを入力できます。",
+      "logIn": "サインイン",
+      "signUp": "アカウントを作成",
+      "a11y": {
+        "logInHint": "サインインを開きます。その後、招待コードを入力できます。",
+        "signUpHint": "登録を開きます。その後、招待コードを入力できます。"
+      }
+    },
     "signIn": {
-      "title": "おかえりなさい",
+      "headerTitle": "ログイン",
+      "title": "ログイン",
       "email": "メール",
       "password": "パスワード",
       "emailPlaceholder": "you@example.com",
       "passwordPlaceholder": "••••••••",
       "submit": "サインイン",
       "noAccount": "アカウントをお持ちでないですか？ ",
-      "create": "作成する"
+      "create": "作成する",
+      "a11y": {
+        "submitHint": "入力したメールとパスワードでサインインします。",
+        "createLinkHint": "新規アカウント作成画面を開きます。"
+      }
     },
     "signUp": {
+      "headerTitle": "アカウントを作成",
       "createTitle": "アカウントを作成",
       "step1of2": "ステップ 1 / 2",
       "fullName": "氏名",
@@ -112,18 +379,55 @@
       "hasAccount": "すでにアカウントをお持ちですか？ ",
       "signInLink": "サインイン",
       "successTitle": "メールを確認してください",
-      "successDesc": "{{email}} に確認リンクを送りました。開いてアカウントを有効化してください。数分経っても届かない場合は迷惑メールやプロモーションをご確認ください。",
+      "successBeforeEmail": "",
+      "successAfterEmail": " に確認リンクを送りました。開いてアカウントを有効化してください。数分経っても届かない場合は迷惑メールやプロモーションをご確認ください。",
       "goSignIn": "サインインへ",
+      "a11y": {
+        "continueHint": "入力内容で次のステップに進みます。",
+        "createAccountHint": "Kinアカウントを作成し、確認メールを送信します。",
+        "signInLinkHint": "サインイン画面に戻ります。",
+        "goSignInHint": "メール入力のサインイン画面を開きます。",
+        "editDetailsHint": "内容を変えるため、ステップ1に戻ります。",
+        "successIconLabel": "メール確認",
+        "legalCheckbox": "利用規約とプライバシーポリシーに同意"
+      },
       "errors": {
         "allFields": "すべての項目を入力してください。",
         "passwordLength": "パスワードは8文字以上にしてください。",
-        "duplicateEmail": "このメールは既に登録されています。サインインするか、Supabase の Authentication → Users からユーザーを削除してください。"
+        "duplicateEmail": "このメールは既に登録されています。サインインするか、Supabase の Authentication → Users からユーザーを削除してください。",
+        "legalRequired": "続けるには利用規約とプライバシーポリシーに同意してください。"
       }
     },
     "welcome": {
+      "hubTitle": "Kin へようこそ",
+      "hubTagline": "家族のケアを、落ち着いたひとつの場所で。",
+      "legalPrefix": "",
+      "termsLink": "利用規約",
+      "legalMid": "および",
+      "privacyLink": "プライバシーポリシー",
+      "legalSuffix": "に同意します。",
+      "logIn": "ログイン",
+      "signUp": "登録",
+      "joinFamily": "家族に参加",
+      "continueWithEmail": "メールで続ける",
+      "or": "または",
+      "learnMore": "もっと見る",
+      "back": "戻る",
       "skip": "スキップ",
       "next": "次へ",
       "getStarted": "はじめる",
+      "a11y": {
+        "backHint": "前のイントロのスライドに戻ります。",
+        "skipHint": "イントロを閉じてサインインに進みます。",
+        "skipPostAuthHint": "ツアーをスキップしてアプリを開きます。",
+        "legalCheckbox": "アカウント作成前に規約とプライバシーに同意します。",
+        "logInHint": "サインインを開きます。",
+        "signUpHint": "同意後に登録画面を開きます。",
+        "joinFamilyHint": "招待での参加方法を説明し、サインインまたは登録へ。",
+        "learnMoreHint": "Kin の機能を簡単に紹介します。",
+        "getStartedHint": "サインインまたはアカウント作成に進みます。",
+        "nextHint": "スライド {{next}} / {{total}} に移動します。"
+      },
       "slide1Headline": "ケアをひとまとめに。",
       "slide1Body": "服薬、タスク、予定を落ち着いた一か所で。",
       "slide2Headline": "状況を共有。",
@@ -131,6 +435,29 @@
       "slide3Headline": "認識をそろえる。",
       "slide3Body": "家族と介護者のための共有スペース。グループチャットの混乱なし。"
     }
+    ,
+    "postAuthOnboarding": {
+      "icons": {
+        "careTracking": "ケアの記録",
+        "familyCommunication": "家族のコミュニケーション",
+        "sharedFamilySpace": "共有の家族スペース"
+      }
+    }
+  },
+  "doctors": {
+    "linkedMedsLabel": "薬",
+    "menu": { "scheduleVisit": "受診予定を追加" },
+    "draft": {
+      "visitTitle": "受診: {{name}}",
+      "fallbackTitle": "受診予定"
+    },
+    "errors": { "deleteFailedTitle": "医師を削除できませんでした" },
+    "empty": {
+      "title": "医師はまだいません",
+      "message": "名前、専門、連絡先、次回受診日を保存できます。薬を紐付けて、誰が何を処方しているか共有できます。",
+      "action": "医師を追加"
+    },
+    "a11y": { "doctorFallback": "医師" }
   },
   "home": {
     "caringFor": "{{name}} の介護",
@@ -163,6 +490,145 @@
       "documents": { "label": "書類", "desc": "医療・法的ファイル" },
       "notes": { "label": "メモ", "desc": "家族みんなの更新" },
       "members": { "label": "メンバー", "desc": "家族と介護者" }
+    },
+    "dashboardSummary": {
+      "common": {
+        "log": "記録"
+      },
+      "todayAtAGlance": {
+        "title": "今日のまとめ"
+      },
+      "timeAgo": {
+        "justNow": "たった今",
+        "hoursAgo_one": "{{count}}時間前",
+        "hoursAgo_other": "{{count}}時間前",
+        "daysAgo_one": "{{count}}日前",
+        "daysAgo_other": "{{count}}日前"
+      },
+      "checkIn": {
+        "question": "今日は {{name}} の調子はどうですか？",
+        "moodSummary": {
+          "great": "今日はとても元気！",
+          "good": "良い一日です",
+          "okay": "なんとかやっています",
+          "concerning": "少し心配があります",
+          "emergency": "すぐに対応が必要です"
+        }
+      },
+      "medicationsToday": {
+        "title": "今日の服薬",
+        "noneTracked": "追跡中の薬はありません",
+        "allDosesLogged": "すべて記録済み",
+        "dosesRemaining": "残り {{remaining}} / {{total}} 回",
+        "chooseBelow": "下から薬を選んで服用を記録してください",
+        "hideMedications": "薬を隠す",
+        "showMedicationsToLog_one": "記録する薬を{{count}}件表示",
+        "showMedicationsToLog_other": "記録する薬を{{count}}件表示"
+      },
+      "tasks": {
+        "allCaughtUp": "すべて完了",
+        "overdueAndOpen": "期限切れ {{overdue}} · 未完了 {{open}}",
+        "open_one": "未完了 {{count}}",
+        "open_other": "未完了 {{count}}",
+        "chooseBelow": "下からタスクを選んで完了にできます",
+        "overduePill": "期限切れ",
+        "hideTasks": "タスクを隠す",
+        "showTasksToComplete_one": "完了するタスクを{{count}}件表示",
+        "showTasksToComplete_other": "完了するタスクを{{count}}件表示",
+        "dueOn": "期限 {{date}}"
+      },
+      "nextEvent": {
+        "title": "次の予定",
+        "none": "今後の予定はありません"
+      },
+      "doctors": {
+        "emptyPrompt": "連絡先・専門分野・関連する薬を追加しましょう",
+        "nextVisitPrefix": "次の受診 ·",
+        "onFileTapToAddNextVisit": "{{count}} 件登録済み — 次回受診を追加"
+      },
+      "todaysCheckIn": {
+        "title": "今日のチェックイン"
+      }
+    }
+  },
+  "visitPrep": {
+    "screenTitle": "受診準備",
+    "promo": {
+      "pillLabel": "AIレポート",
+      "a11yCollapsed": "AIレポート",
+      "a11yExpandedSummary": "受診準備のサマリー",
+      "a11yCollapsedHint": "受診準備のサマリーを展開します。展開後にもう一度操作すると受診準備を開きます。",
+      "a11yExpandedHint": "受診準備画面を開きます。",
+      "a11yHideSummary": "受診準備のサマリーを隠す",
+      "badge": "AI",
+      "eyebrow": "受診準備",
+      "heroTitle": "医師向けに整えたブリーフィング",
+      "heroSub": "服薬・チェックイン・タスク・メモを、受診時に渡しやすい1本にまとめます。"
+    },
+    "tabs": {
+      "summary": "サマリー",
+      "history": "履歴"
+    },
+    "introFull": "<0>{{name}}</0> の直近30日間の健康ログと現在の服薬から、受診準備の下書きを作成します。内容を確認し、必要に応じて医療専門家に相談してください。実行のたびに履歴へ自動保存されます。",
+    "introTitle": "受診準備（AIが作成した下書き）",
+    "generateCta": "受診サマリーを生成",
+    "analyzing": "健康データを分析しています…",
+    "generationTimeout": "想定より時間がかかっています。接続を確認して再度お試しください。",
+    "generationStalled": "更新を受信できていません。接続を確認して再度お試しください。",
+    "loadingHistory": "履歴を読み込み中…",
+    "historyLoadError": "履歴を読み込めませんでした。もう一度お試しください。",
+    "emptyHistoryTitle": "保存されたサマリーはまだありません",
+    "emptyHistoryMsg": "受診サマリーを生成すると、ここに自動で保存されます。",
+    "goToSummary": "サマリーへ",
+    "generatedPrefix": "生成日時 {{date}}",
+    "copy": "コピー",
+    "refresh": "更新",
+    "viewPlans": "プランを見る",
+    "tryAgain": "再試行",
+    "allSummaries": "すべてのサマリー",
+    "tapToReadFull": "タップして全文を読む",
+    "a11ySummaryOptions": "サマリーのオプション",
+    "a11yOpenSummary": "サマリーを開く",
+    "toastCopied": "クリップボードにコピーしました",
+    "toastNothingToExport": "エクスポートする内容がありません",
+    "toastCopiedBrowser": "コピーしました（ブラウザでは共有できません）",
+    "toastShareFallback": "共有できませんでした — クリップボードにコピーしました",
+    "toastShareCopyFailed": "共有もコピーもできませんでした",
+    "toastSummaryDeleted": "サマリーを削除しました",
+    "toastNameUpdated": "名前を更新しました",
+    "toastNameCleared": "カスタム名を削除しました",
+    "shareTitle": "受診準備サマリー",
+    "export": {
+      "line1": "AI生成の受診準備（参考情報のみ — 医療アドバイスではありません）",
+      "line2": "医療専門家と内容を確認してください。緊急の可能性がある場合は地域の救急番号に連絡してください。"
+    },
+    "deleteConfirmTitle": "このサマリーを削除しますか？",
+    "deleteConfirmMessage": "元に戻せません。",
+    "delete": "削除",
+    "couldNotDelete": "削除できませんでした",
+    "couldNotSave": "保存できませんでした",
+    "unknownError": "不明なエラー",
+    "menuTitle": "サマリー",
+    "read": "読む",
+    "rename": "名前を変更",
+    "exportAction": "エクスポート",
+    "cannotDeleteTitle": "削除できません",
+    "cannotDeleteMessage": "このサマリーを作成した本人か、家族の管理者だけが削除できます。",
+    "renameModalTitle": "サマリーの名前を変更",
+    "renameModalHint": "任意です。下に表示される生成日時は変わりません。",
+    "renamePlaceholder": "例：陳医師 — フォロー",
+    "troubleshoot": {
+      "postgrest": "PostgREST が visit_prep_summaries をまだ認識していません。順に試してください:\n1) Supabase Dashboard → SQL → supabase/migrations/20260421140000_visit_prep_summaries.sql を実行\n2) 約1分待ってからここで引っ張って更新\n3) まだ失敗する場合: Dashboard → Project Settings → General でプロジェクトを一時停止して再開",
+      "missingRelation": "Supabase に visit_prep_summaries テーブルを追加してください（.claude/schema.sql 参照）"
+    }
+  },
+  "medications": {
+    "detail": {
+      "prescribedBy": "処方医",
+      "notLinked": "未設定",
+      "openDoctorsHint": "「医者」からこの薬を紐付け",
+      "openDoctorsA11y": "処方医：未設定。「医者」を開いて紐付け。",
+      "prescriberFallbackName": "医師"
     }
   }
 }

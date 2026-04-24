@@ -24,6 +24,8 @@ import { useNotificationPrefs } from '../../store/notifications';
 import type { Task } from '../../types';
 import { useTheme, type Theme, space, typography } from '../../theme';
 import { Icon } from '../../components/Icon';
+import { UserAvatar } from '../../components/UserAvatar';
+import { useFormatLocaleTag } from '../../i18n/useFormatLocaleTag';
 
 interface AddTaskSheetProps {
   familyId: string;
@@ -33,8 +35,8 @@ interface AddTaskSheetProps {
   editing?: Task;
 }
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(d: Date, locale: string) {
+  return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function memberInitials(name: string): string {
@@ -79,6 +81,7 @@ async function triggerAssigneePush(params: {
 export function AddTaskSheet({ familyId, visible, onClose, onAdded, editing }: AddTaskSheetProps) {
   const t = useTheme();
   const styles = makeStyles(t);
+  const formatLocale = useFormatLocaleTag();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const updateTask = useUpdateTask(familyId);
@@ -168,11 +171,15 @@ export function AddTaskSheet({ familyId, visible, onClose, onAdded, editing }: A
 
   async function handleSubmit() {
     if (!title.trim()) { setError('Title is required'); return; }
+    if (!user?.id) {
+      setError('Session expired. Please sign in again to save this task.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
 
     const dueDateStr = dueDate ? dueDate.toISOString() : undefined;
-    const assignerId = user!.id;
+    const assignerId = user.id;
 
     if (editing) {
       const oldAssigneeId = editing.assigned_to ?? null;
@@ -295,9 +302,13 @@ export function AddTaskSheet({ familyId, visible, onClose, onAdded, editing }: A
                   onPress={() => { setAssignedTo(isSelected ? null : m.user_id); setAssigneePickerOpen(false); }}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{initials}</Text>
-                  </View>
+                  <UserAvatar
+                    size={32}
+                    avatarStoragePath={m.profiles?.avatar_url}
+                    initials={initials}
+                    backgroundColor={t.accentLight}
+                    textColor={t.accent}
+                  />
                   <Text style={[styles.memberName, isSelected && styles.memberNameSelected]}>
                     {name}
                   </Text>
@@ -330,7 +341,7 @@ export function AddTaskSheet({ familyId, visible, onClose, onAdded, editing }: A
             </TouchableOpacity>
           ) : null}
           <Text style={[styles.fieldValue, !dueDate && styles.fieldValuePlaceholder]}>
-            {dueDate ? formatDate(dueDate) : 'None'}
+            {dueDate ? formatDate(dueDate, formatLocale) : 'None'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -394,11 +405,6 @@ function makeStyles(t: Theme) {
       paddingHorizontal: space[4], paddingVertical: space[3],
     },
     memberRowSelected: { backgroundColor: t.accentLight },
-    memberAvatar: {
-      width: 32, height: 32, borderRadius: 16,
-      backgroundColor: t.accentLight, alignItems: 'center', justifyContent: 'center',
-    },
-    memberAvatarText: { fontSize: 12, fontWeight: '700', color: t.accent },
     memberName: { flex: 1, ...typography.body, color: t.text },
     memberNameSelected: { color: t.accent, fontWeight: '600' },
     calendarWrapper: {

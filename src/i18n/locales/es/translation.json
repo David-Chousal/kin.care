@@ -16,9 +16,285 @@
   "common": {
     "cancel": "Cancelar",
     "save": "Guardar",
-    "edit": "Editar"
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "add": "Agregar",
+    "done": "Listo",
+    "event": "Evento",
+    "entry": "Entrada",
+    "document": "Documento",
+    "open": "Abrir",
+    "upload": "Subir",
+    "doctor": "Doctor",
+    "removed": "Eliminado: {{item}}",
+    "pleaseTryAgain": "Inténtalo de nuevo.",
+    "clearAll": "Borrar todo",
+    "a11y": {
+      "swipeToRevealDeleteHint": "Desliza para eliminar."
+    },
+    "errors": {
+      "genericTryAgain": "Algo salió mal. Inténtalo de nuevo."
+    }
+  },
+  "subscription": {
+    "screenTitle": "Suscripción"
+  },
+  "medications": {
+    "detail": {
+      "screenTitle": "Medicamento"
+    }
+  },
+  "calendar": {
+    "sections": {
+      "upcoming": "Próximos",
+      "pastEventsWithCount_one": "Evento pasado ({{count}})",
+      "pastEventsWithCount_other": "Eventos pasados ({{count}})"
+    },
+    "empty": {
+      "title": "Aún no hay eventos",
+      "message": "Agrega citas y visitas para que los recordatorios se mantengan al día.",
+      "action": "Agrega tu primer evento"
+    },
+    "errors": {
+      "deleteFailedTitle": "No se pudo eliminar el evento"
+    },
+    "a11y": {
+      "pastEventsLabel_one": "Eventos pasados, {{count}} elemento",
+      "pastEventsLabel_other": "Eventos pasados, {{count}} elementos",
+      "eventFallback": "Evento del calendario"
+    },
+    "addEvent": {
+      "titleNew": "Nuevo evento",
+      "titleEdit": "Editar evento",
+      "fields": {
+        "titleRequired": "Título *",
+        "date": "Fecha",
+        "includeTime": "Incluir hora",
+        "location": "Ubicación",
+        "notes": "Notas"
+      },
+      "placeholders": {
+        "title": "p. ej., cita médica",
+        "location": "p. ej., Hospital St. Mary's",
+        "notes": "Notas opcionales…"
+      },
+      "errors": {
+        "titleRequired": "El título del evento es obligatorio.",
+        "saveFailed": "No se pudo guardar el evento. {{message}}"
+      },
+      "alerts": {
+        "sessionExpired": {
+          "title": "Sesión caducada",
+          "body": "Inicia sesión de nuevo para agregar un evento."
+        }
+      },
+      "a11y": {
+        "titleInput": "Título del evento"
+      }
+    }
+  },
+  "health": {
+    "filters": {
+      "all": "Todas",
+      "symptoms": "Síntomas",
+      "vitals": "Signos vitales",
+      "mood": "Ánimo",
+      "notes": "Notas"
+    },
+    "empty": {
+      "all": {
+        "title": "Aún no hay entradas",
+        "message": "Registra síntomas, signos vitales, ánimo o notas para ver patrones con el tiempo."
+      },
+      "symptoms": {
+        "title": "Aún no hay síntomas",
+        "message": "Aún no hay nada registrado aquí. Agrega un síntoma cuando algo cambie."
+      },
+      "vitals": {
+        "title": "Aún no hay signos vitales",
+        "message": "Aún no hay nada registrado aquí. Agrega un registro cuando tengas una medición."
+      },
+      "mood": {
+        "title": "Aún no hay entradas de ánimo",
+        "message": "Aún no hay nada registrado aquí. Registra cómo se sintió el día."
+      },
+      "notes": {
+        "title": "Aún no hay notas",
+        "message": "Aún no hay nada registrado aquí. Escribe una nota rápida para el equipo."
+      },
+      "actions": {
+        "first": "Agrega tu primera entrada",
+        "add": "Agregar entrada"
+      }
+    },
+    "errors": {
+      "deleteFailedTitle": "No se pudo eliminar la entrada"
+    },
+    "a11y": {
+      "viewPhoto": "Ver foto",
+      "addPhoto": "Agregar foto",
+      "changePhoto": "Cambiar foto",
+      "entryOptions": "Opciones de la entrada",
+      "entryFallback": "Entrada del registro de salud",
+      "closePhoto": "Cerrar foto"
+    }
+  },
+  "documents": {
+    "filters": { "all": "Todas" },
+    "categories": {
+      "medical": "Médicos",
+      "legal": "Legales",
+      "insurance": "Seguros",
+      "general": "Generales"
+    },
+    "empty": {
+      "all": {
+        "title": "Aún no hay documentos",
+        "message": "Guarda archivos médicos, legales y de seguros en un solo lugar seguro.",
+        "action": "Sube tu primer documento"
+      },
+      "filtered": {
+        "title": "Aún no hay documentos {{category}}",
+        "message": "Aún no hay nada en {{category}}. Sube un archivo para agregarlo aquí.",
+        "action": "Subir un documento"
+      }
+    },
+    "errors": {
+      "openFailedTitle": "No se pudo abrir el documento",
+      "noAppBody": "No hay ninguna app disponible para abrir este tipo de archivo.",
+      "deleteFailedTitle": "No se pudo eliminar el documento"
+    },
+    "a11y": {
+      "documentLabel": "Documento: {{name}}",
+      "documentLabelNoName": "Documento"
+    }
+  },
+  "tasks": {
+    "board": {
+      "filters": {
+        "all": "Todas",
+        "mine": "Asignadas a mí",
+        "others": "Asignadas a otros"
+      },
+      "sections": {
+        "todo": "Por hacer",
+        "completed": "Completadas · {{count}}"
+      },
+      "countSuffix": " · {{count}}",
+      "unassigned": "Sin asignar",
+      "memberFallback": "Miembro",
+      "due": "Vence {{date}}",
+      "swipe": {
+        "done": "Hecho"
+      },
+      "toast": {
+        "updateFailed": "No se pudo actualizar la tarea. Inténtalo de nuevo.",
+        "completed": "Tarea completada",
+        "updated": "Tarea actualizada",
+        "added": "Tarea agregada"
+      },
+      "completed": {
+        "showAll": "Mostrar todo",
+        "showLess": "Mostrar menos"
+      },
+      "empty": {
+        "filtered": {
+          "title": "No hay tareas aquí",
+          "mine": "No tienes tareas asignadas.",
+          "others": "No hay tareas asignadas a otros.",
+          "action": "Mostrar todas las tareas"
+        },
+        "first": {
+          "title": "Aún no hay tareas",
+          "message": "Crea tareas para medicamentos, citas o cualquier cosa que el equipo deba recordar.",
+          "action": "Agrega tu primera tarea"
+        },
+        "caughtUp": {
+          "title": "Todo al día",
+          "message": "No hay tareas abiertas ahora. Agrega otra cuando surja algo nuevo.",
+          "action": "Agregar una tarea"
+        }
+      },
+      "a11y": {
+        "taskLabel": "Tarea: {{title}}",
+        "taskLabelNoTitle": "Tarea",
+        "actionsHint": "Acciones disponibles. Desliza hacia arriba o abajo para ver acciones.",
+        "moreActions": "Más acciones. {{taskLabel}}",
+        "markDone": "Marcar como hecha. {{taskLabel}}",
+        "markNotDone": "Marcar como no hecha. {{taskLabel}}",
+        "actionMarkDone": "Marcar hecha",
+        "showAllCompleted": "Mostrar las {{completedTotal}} tareas completadas. {{hiddenCount}} ocultas.",
+        "showFewerCompleted": "Mostrar menos tareas completadas"
+      }
+    }
+  },
+  "connectivity": {
+    "offlineTitle": "Sin conexión",
+    "offlineBody": "Las pantallas cargadas recientemente siguen funcionando. Los cambios se guardan en el dispositivo y se sincronizan al volver la conexión.",
+    "dismissOfflineBannerA11y": "Cerrar aviso sin conexión",
+    "unstableTitle": "Conexión inestable",
+    "unstableBody": "La red es débil; es posible que algunas acciones no se guarden hasta que mejore.",
+    "syncPausedTitle": "Sincronización en vivo en pausa",
+    "syncPausedBody": "Se perdió la conexión en vivo con el servidor. Tus cambios deberían guardarse; otros cuidadores pueden no ver actualizaciones hasta que se restablezca."
+  },
+  "family": {
+    "inviteMember": {
+      "screenTitle": "Invitar a un miembro",
+      "subtitle": "Kin no les envía correos automáticamente: guardamos su email, así que debe coincidir con su cuenta. Después de crear una invitación, usa Compartir invitación para que reciban las instrucciones completas.",
+      "emailPlaceholder": "Dirección de email",
+      "roleLabel": "Rol",
+      "roles": {
+        "member": "Miembro",
+        "viewer": "Observador"
+      },
+      "errors": {
+        "emailRequired": "El email es obligatorio.",
+        "emailInvalid": "Ingresa una dirección de email válida.",
+        "createFailed": "No se pudo crear la invitación."
+      },
+      "alerts": {
+        "shareFallback": {
+          "title": "Invitación copiada",
+          "body": "No pudimos abrir la hoja para compartir. El mensaje completo de invitación está en tu portapapeles: pégalo en Mensajes, email u otra app."
+        },
+        "mailOpenFailed": {
+          "title": "No se pudo abrir Mail",
+          "body": "Usa Compartir invitación o Copiar mensaje de invitación y pégalo en tu app de correo."
+        }
+      },
+      "share": {
+        "androidTitle": "Invitación para unirte a Kin"
+      },
+      "success": {
+        "title": "Invitación lista",
+        "body": "Invitación para {{email}}. Su cuenta de Kin debe usar este mismo email. Toca Compartir invitación para enviar las instrucciones completas",
+        "platformNote": " (en iPhone y Android intentamos abrir la hoja para compartir justo después de crear la invitación)."
+      },
+      "buttons": {
+        "share": "Compartir invitación",
+        "email": "Enviar por email",
+        "copyMessage": "Copiar mensaje de invitación",
+        "create": "Crear invitación"
+      },
+      "toast": {
+        "copied": "Copiado al portapapeles"
+      },
+      "codeDisclosure": {
+        "needCodeOnly": "¿Solo necesitas el código?",
+        "hide": "Ocultar código"
+      },
+      "codeBlock": {
+        "label": "Código de invitación",
+        "hint": "Lo ingresan en \"¿Tienes un código de invitación? Únete a tu familia\""
+      },
+      "a11y": {
+        "hideCode": "Ocultar código de invitación",
+        "showCodeOnly": "Mostrar solo el código"
+      }
+    }
   },
   "settings": {
+    "screenTitle": "Configuración",
     "sections": {
       "account": "Cuenta",
       "family": "Familia",
@@ -26,7 +302,20 @@
       "privacy": "Privacidad y datos",
       "about": "Acerca de"
     },
-    "profile": { "displayNamePlaceholder": "Nombre para mostrar" },
+    "profile": {
+      "displayNamePlaceholder": "Nombre para mostrar",
+      "avatarTitle": "Foto de perfil",
+      "avatarMessage": "Elige un origen o quita la foto actual.",
+      "avatarChoosePhoto": "Elegir de la galería",
+      "avatarTakePhoto": "Tomar foto",
+      "avatarRemove": "Quitar foto",
+      "avatarRemoveConfirmTitle": "¿Quitar la foto de perfil?",
+      "avatarRemoveConfirmMessage": "Se eliminará tu foto de Kin.",
+      "avatarPermissionTitle": "Permiso necesario",
+      "avatarLibraryPermissionMessage": "Permite el acceso a la galería en los ajustes del dispositivo para elegir una foto.",
+      "avatarCameraPermissionMessage": "Permite el acceso a la cámara en los ajustes del dispositivo para tomar una foto.",
+      "avatarUploadFailedTitle": "No se pudo actualizar la foto"
+    },
     "family": {
       "nameLabel": "Nombre de la familia",
       "namePlaceholder": "Nombre de la familia",
@@ -42,6 +331,72 @@
       "notificationsSub": "Notificaciones push y recordatorios",
       "accessibility": "Accesibilidad",
       "accessibilitySub": "Háptica; las transiciones siguen Reducir movimiento del sistema cuando está disponible"
+    },
+    "appearance": {
+      "colorSchemeLabel": "Esquema de color",
+      "options": { "light": "Claro", "dark": "Oscuro", "system": "Sistema" }
+    },
+    "accessibility": {
+      "haptics": {
+        "label": "Retroalimentación háptica",
+        "sublabel": "Vibraciones suaves al registrar dosis, completar tareas, expandir listas y más"
+      },
+      "footnote": "Las transiciones de pantalla siguen el ajuste Reducir movimiento del dispositivo cuando está disponible."
+    },
+    "notifications": {
+      "webNotSupported": {
+        "title": "No compatible en la web",
+        "body": "Las notificaciones push y las preferencias de recordatorios solo están disponibles en la app móvil de Kin para iOS y Android. Abre esta pantalla en la app para activar o desactivar categorías."
+      },
+      "master": {
+        "label": "Notificaciones push",
+        "disabledInSystem": "Desactivadas en los Ajustes del sistema"
+      },
+      "taskReminders": { "label": "Recordatorios de tareas" },
+      "taskAssigned": {
+        "label": "Tarea asignada a mí",
+        "sublabel": "Notificación cuando un familiar te asigna una tarea"
+      },
+      "medicationAlerts": {
+        "label": "Alertas de medicamentos",
+        "sublabel": "Los recordatorios de dosis usan los horarios programados de cada medicamento (Medicamentos → Editar). Las alertas de reposición usan la cantidad y el umbral de alerta."
+      },
+      "checkinReminders": { "label": "Recordatorios de check-in" },
+      "eventReminders": { "label": "Recordatorios de eventos" },
+      "footnote": "Si las notificaciones están desactivadas a nivel del sistema, actívalas en los Ajustes del dispositivo."
+    },
+    "dataPrivacy": {
+      "intro": "Las acciones masivas de abajo se aplican a toda la familia y son permanentes. Están limitadas a administradores para que los miembros no borren por error el historial médico compartido.",
+      "notAdminNotice": "No eres administrador de la familia. Pídele a un administrador si necesitas borrar todo Visit Prep o los registros de salud.",
+      "sectionHeader": "Borrar datos familiares",
+      "rows": {
+        "clearVisitPrep": {
+          "label": "Borrar todo el historial de Visit Prep",
+          "sublabel": "Elimina todos los resúmenes de IA guardados de esta familia (solo administradores)."
+        },
+        "clearHealthLogs": {
+          "label": "Borrar todos los registros de salud",
+          "sublabel": "Elimina todas las entradas del registro de salud de esta familia (solo administradores)."
+        }
+      },
+      "alerts": {
+        "adminsOnly": {
+          "title": "Solo administradores",
+          "visitPrepBody": "Solo un administrador de la familia puede borrar todo el historial de Visit Prep para todos en esta familia.",
+          "healthBody": "Solo un administrador de la familia puede borrar todas las entradas del registro de salud para todos en esta familia."
+        },
+        "confirmClearVisitPrep": {
+          "title": "¿Borrar todo el historial de Visit Prep?",
+          "body": "Esto elimina todos los resúmenes de visitas con IA guardados de esta familia. No se puede deshacer."
+        },
+        "confirmClearHealthLogs": {
+          "title": "¿Borrar todos los registros de salud?",
+          "body": "Esto elimina todas las entradas del registro de salud de esta familia. No se puede deshacer."
+        },
+        "clearedVisitPrep": "Se eliminaron todos los resúmenes de Visit Prep.",
+        "clearedHealthLogs": "Se eliminaron todas las entradas del registro de salud.",
+        "couldNotClear": "No se pudo borrar"
+      }
     },
     "privacy": {
       "dataPrivacy": "Datos y privacidad",
@@ -66,8 +421,10 @@
       "exportFailedTitle": "Exportación fallida",
       "exportFailedMessage": "No se pudieron exportar los datos. Inténtalo de nuevo.",
       "deleteTitle": "Eliminar cuenta",
-      "deleteMessage": "Esto quitará tu acceso a esta familia y cerrará tu sesión. Tus datos se eliminarán de forma permanente en un plazo de 30 días.\n\nNo se puede deshacer.",
+      "deleteMessage": "Esto eliminará tu cuenta de forma permanente y borrará tus datos de Kin.\n\nNo se puede deshacer.",
       "deleteConfirm": "Eliminar mi cuenta",
+      "deleteFailedTitle": "Error al eliminar",
+      "deleteFailedMessage": "No se pudo eliminar tu cuenta. Inténtalo de nuevo.",
       "signOutTitle": "Cerrar sesión",
       "signOutMessage": "¿Seguro que quieres cerrar sesión?",
       "signOutConfirm": "Cerrar sesión"
@@ -88,19 +445,54 @@
     }
   },
   "auth": {
-    "brand": { "name": "Kin", "tagline": "Cuidado, coordinado." },
+    "brand": { "name": "Kin", "tagline": "Cuidado, coordinado.", "markLabel": "Marca de Kin" },
+    "password": {
+      "showA11y": "Mostrar contraseña",
+      "hideA11y": "Ocultar contraseña"
+    },
+    "forgotPassword": {
+      "headerTitle": "Restablecer contraseña",
+      "link": "¿Olvidaste tu contraseña?",
+      "lead": "Introduce el correo de tu cuenta. Te enviaremos un enlace para elegir una nueva contraseña.",
+      "submit": "Enviar enlace",
+      "sentTitle": "Revisa tu correo",
+      "sentBody": "Si existe una cuenta con esa dirección, enviamos un enlace de restablecimiento. Ábrelo en este dispositivo para definir una nueva contraseña.",
+      "errors": {
+        "emailRequired": "Introduce tu correo."
+      },
+      "a11y": {
+        "linkHint": "Abre la pantalla de restablecer contraseña."
+      }
+    },
+    "joinFamily": {
+      "headerTitle": "Unirse a una familia",
+      "title": "Unirse a una familia",
+      "body": "Las invitaciones van ligadas a tu correo. Inicia sesión o crea una cuenta con el mismo correo que usó quien te invitó. Luego podrás introducir el código en la siguiente pantalla.",
+      "logIn": "Iniciar sesión",
+      "signUp": "Crear una cuenta",
+      "a11y": {
+        "logInHint": "Abre iniciar sesión. Después podrás introducir el código de invitación.",
+        "signUpHint": "Abre registro. Después podrás introducir el código de invitación."
+      }
+    },
     "signIn": {
-      "title": "Bienvenido de nuevo",
+      "headerTitle": "Iniciar sesión",
+      "title": "Iniciar sesión",
       "email": "Correo",
       "password": "Contraseña",
       "emailPlaceholder": "tu@ejemplo.com",
       "passwordPlaceholder": "••••••••",
       "submit": "Iniciar sesión",
       "noAccount": "¿No tienes cuenta? ",
-      "create": "Crear una"
+      "create": "Crear una",
+      "a11y": {
+        "submitHint": "Inicia sesión con el correo y la contraseña que ingresaste.",
+        "createLinkHint": "Abre la pantalla para crear una cuenta nueva."
+      }
     },
     "signUp": {
-      "createTitle": "Crea tu cuenta",
+      "headerTitle": "Crear una cuenta",
+      "createTitle": "Crear una cuenta",
       "step1of2": "Paso 1 de 2",
       "fullName": "Nombre completo",
       "namePlaceholder": "María García",
@@ -116,18 +508,55 @@
       "hasAccount": "¿Ya tienes cuenta? ",
       "signInLink": "Iniciar sesión",
       "successTitle": "Revisa tu correo",
-      "successDesc": "Enviamos un enlace de confirmación a {{email}}. Ábrelo para activar tu cuenta. Si no llega en unos minutos, revisa spam o Promociones.",
+      "successBeforeEmail": "Enviamos un enlace de confirmación a ",
+      "successAfterEmail": ". Ábrelo para activar tu cuenta. Si no llega en unos minutos, revisa spam o Promociones.",
       "goSignIn": "Ir a iniciar sesión",
+      "a11y": {
+        "continueHint": "Pasa al siguiente paso con los datos que ingresaste.",
+        "createAccountHint": "Crea tu cuenta de Kin y envía un correo de confirmación.",
+        "signInLinkHint": "Vuelve a la pantalla de iniciar sesión.",
+        "goSignInHint": "Abre iniciar sesión para introducir tu correo.",
+        "editDetailsHint": "Vuelve al primer paso para cambiar tus datos.",
+        "successIconLabel": "Confirmación por correo",
+        "legalCheckbox": "Aceptar términos y política de privacidad"
+      },
       "errors": {
         "allFields": "Completa todos los campos.",
         "passwordLength": "La contraseña debe tener al menos 8 caracteres.",
-        "duplicateEmail": "Ese correo ya tiene una cuenta. Prueba iniciar sesión o elimina el usuario en Supabase → Authentication → Users."
+        "duplicateEmail": "Ese correo ya tiene una cuenta. Prueba iniciar sesión o elimina el usuario en Supabase → Authentication → Users.",
+        "legalRequired": "Acepta los Términos y la Política de privacidad para continuar."
       }
     },
     "welcome": {
+      "hubTitle": "Bienvenido a Kin",
+      "hubTagline": "Cuidado familiar, coordinado en un solo lugar tranquilo.",
+      "legalPrefix": "Acepto los ",
+      "termsLink": "Términos",
+      "legalMid": " y la ",
+      "privacyLink": "Política de privacidad",
+      "legalSuffix": ".",
+      "logIn": "Iniciar sesión",
+      "signUp": "Registrarse",
+      "joinFamily": "Unirse a una familia",
+      "continueWithEmail": "Continuar con correo",
+      "or": "o",
+      "learnMore": "Saber más",
+      "back": "Atrás",
       "skip": "Omitir",
       "next": "Siguiente",
       "getStarted": "Empezar",
+      "a11y": {
+        "backHint": "Vuelve a la diapositiva anterior de la introducción.",
+        "skipHint": "Cierra la introducción y continúa para iniciar sesión.",
+        "skipPostAuthHint": "Omitir el recorrido y abrir la app.",
+        "legalCheckbox": "Acepta términos y privacidad antes de crear una cuenta.",
+        "logInHint": "Abre iniciar sesión.",
+        "signUpHint": "Abre registro tras aceptar términos y privacidad.",
+        "joinFamilyHint": "Explica cómo unirse con invitación; luego inicia sesión o regístrate.",
+        "learnMoreHint": "Breve recorrido de lo que hace Kin.",
+        "getStartedHint": "Continúa para iniciar sesión o crear cuenta.",
+        "nextHint": "Ir a la diapositiva {{next}} de {{total}}."
+      },
       "slide1Headline": "Organiza el cuidado.",
       "slide1Body": "Medicamentos, tareas y citas en un solo lugar tranquilo.",
       "slide2Headline": "Comparte novedades.",
@@ -135,6 +564,29 @@
       "slide3Headline": "Mantén el rumbo.",
       "slide3Body": "Un espacio compartido para familia y cuidadores, sin caos de grupos."
     }
+    ,
+    "postAuthOnboarding": {
+      "icons": {
+        "careTracking": "Seguimiento del cuidado",
+        "familyCommunication": "Comunicación familiar",
+        "sharedFamilySpace": "Espacio familiar compartido"
+      }
+    }
+  },
+  "doctors": {
+    "linkedMedsLabel": "Meds",
+    "menu": { "scheduleVisit": "Programar visita" },
+    "draft": {
+      "visitTitle": "Visita: {{name}}",
+      "fallbackTitle": "Visita al médico"
+    },
+    "errors": { "deleteFailedTitle": "No se pudo eliminar el doctor" },
+    "empty": {
+      "title": "Aún no hay doctores",
+      "message": "Guarda nombres, especialidades, información de contacto y próximas visitas. Vincula medicamentos para que todos sepan quién receta qué.",
+      "action": "Agregar un doctor"
+    },
+    "a11y": { "doctorFallback": "Doctor" }
   },
   "home": {
     "caringFor": "Cuidado de {{name}}",
@@ -167,6 +619,145 @@
       "documents": { "label": "Documentos", "desc": "Archivos médicos y legales" },
       "notes": { "label": "Notas", "desc": "Novedades familiares" },
       "members": { "label": "Miembros", "desc": "Familia y cuidadores" }
+    },
+    "dashboardSummary": {
+      "common": {
+        "log": "Registrar"
+      },
+      "todayAtAGlance": {
+        "title": "Resumen de hoy"
+      },
+      "timeAgo": {
+        "justNow": "ahora mismo",
+        "hoursAgo_one": "hace {{count}} h",
+        "hoursAgo_other": "hace {{count}} h",
+        "daysAgo_one": "hace {{count}} d",
+        "daysAgo_other": "hace {{count}} d"
+      },
+      "checkIn": {
+        "question": "¿Cómo está {{name}} hoy?",
+        "moodSummary": {
+          "great": "¡Se encuentra genial hoy!",
+          "good": "Está teniendo un buen día",
+          "okay": "Va tirando",
+          "concerning": "Hoy hay algunas preocupaciones",
+          "emergency": "Necesita atención inmediata"
+        }
+      },
+      "medicationsToday": {
+        "title": "Medicamentos de hoy",
+        "noneTracked": "No hay medicamentos registrados",
+        "allDosesLogged": "Todas las dosis registradas",
+        "dosesRemaining": "Quedan {{remaining}} de {{total}} dosis",
+        "chooseBelow": "Elige un medicamento para registrar una dosis",
+        "hideMedications": "Ocultar medicamentos",
+        "showMedicationsToLog_one": "Mostrar {{count}} medicamento para registrar",
+        "showMedicationsToLog_other": "Mostrar {{count}} medicamentos para registrar"
+      },
+      "tasks": {
+        "allCaughtUp": "Todo al día",
+        "overdueAndOpen": "{{overdue}} vencidas · {{open}} abiertas",
+        "open_one": "{{count}} abierta",
+        "open_other": "{{count}} abiertas",
+        "chooseBelow": "Elige una tarea para marcarla como completada",
+        "overduePill": "Vencida",
+        "hideTasks": "Ocultar tareas",
+        "showTasksToComplete_one": "Mostrar {{count}} tarea para completar",
+        "showTasksToComplete_other": "Mostrar {{count}} tareas para completar",
+        "dueOn": "Vence {{date}}"
+      },
+      "nextEvent": {
+        "title": "Próximo evento",
+        "none": "No hay próximos eventos"
+      },
+      "doctors": {
+        "emptyPrompt": "Añade contactos, especialidad y medicamentos vinculados",
+        "nextVisitPrefix": "Próxima visita ·",
+        "onFileTapToAddNextVisit": "{{count}} en el listado — toca para añadir la próxima visita"
+      },
+      "todaysCheckIn": {
+        "title": "Check-in de hoy"
+      }
+    }
+  },
+  "visitPrep": {
+    "screenTitle": "Prep. visita",
+    "promo": {
+      "pillLabel": "Informe IA",
+      "a11yCollapsed": "Informe IA",
+      "a11yExpandedSummary": "Resumen de preparación de visita",
+      "a11yCollapsedHint": "Amplía el resumen de preparación de visita. Actívalo de nuevo tras ampliar para abrir Prep. visita.",
+      "a11yExpandedHint": "Abre la pantalla de Prep. visita.",
+      "a11yHideSummary": "Ocultar resumen de preparación de visita",
+      "badge": "IA",
+      "eyebrow": "Prep. visita",
+      "heroTitle": "Tu resumen listo para el médico",
+      "heroSub": "Resume medicamentos, check-ins, tareas y notas en un traspaso claro para la visita."
+    },
+    "tabs": {
+      "summary": "Resumen",
+      "history": "Historial"
+    },
+    "introFull": "Genera un borrador de preparación para la visita a partir de los últimos 30 días de registros de salud y medicamentos actuales de <0>{{name}}</0>. Revisa la exactitud y confírmalo con un profesional. Cada ejecución se guarda automáticamente en Historial.",
+    "introTitle": "Prep. visita (borrador generado por IA)",
+    "generateCta": "Generar resumen de visita",
+    "analyzing": "Analizando datos de salud…",
+    "generationTimeout": "Está tardando más de lo esperado. Comprueba la conexión e inténtalo de nuevo.",
+    "generationStalled": "No estamos recibiendo actualizaciones. Comprueba la conexión e inténtalo de nuevo.",
+    "loadingHistory": "Cargando historial…",
+    "historyLoadError": "No pudimos cargar el historial. Inténtalo de nuevo.",
+    "emptyHistoryTitle": "Aún no hay resúmenes guardados",
+    "emptyHistoryMsg": "Genera un resumen de visita para guardarlo aquí automáticamente.",
+    "goToSummary": "Ir al resumen",
+    "generatedPrefix": "Generado {{date}}",
+    "copy": "Copiar",
+    "refresh": "Actualizar",
+    "viewPlans": "Ver planes",
+    "tryAgain": "Reintentar",
+    "allSummaries": "Todos los resúmenes",
+    "tapToReadFull": "Toca para leer el resumen completo",
+    "a11ySummaryOptions": "Opciones del resumen",
+    "a11yOpenSummary": "Abrir resumen",
+    "toastCopied": "Copiado al portapapeles",
+    "toastNothingToExport": "No hay nada que exportar",
+    "toastCopiedBrowser": "Copiado (compartir no disponible en el navegador)",
+    "toastShareFallback": "No se pudo compartir — se copió al portapapeles",
+    "toastShareCopyFailed": "No se pudo compartir ni copiar",
+    "toastSummaryDeleted": "Resumen eliminado",
+    "toastNameUpdated": "Nombre actualizado",
+    "toastNameCleared": "Nombre personalizado eliminado",
+    "shareTitle": "Resumen de preparación de visita",
+    "export": {
+      "line1": "PREPARACIÓN DE VISITA GENERADA POR IA (SOLO INFORMATIVA — NO ES CONSEJO MÉDICO)",
+      "line2": "Verifica con un profesional. Si crees que puede ser una emergencia, llama a los servicios de emergencia locales."
+    },
+    "deleteConfirmTitle": "¿Eliminar este resumen?",
+    "deleteConfirmMessage": "Esta acción no se puede deshacer.",
+    "delete": "Eliminar",
+    "couldNotDelete": "No se pudo eliminar",
+    "couldNotSave": "No se pudo guardar",
+    "unknownError": "Error desconocido",
+    "menuTitle": "Resumen",
+    "read": "Leer",
+    "rename": "Renombrar",
+    "exportAction": "Exportar",
+    "cannotDeleteTitle": "No se puede eliminar",
+    "cannotDeleteMessage": "Solo quien generó este resumen o un administrador de la familia puede eliminarlo.",
+    "renameModalTitle": "Renombrar resumen",
+    "renameModalHint": "Opcional. La fecha y hora de generación siguen siendo las mismas.",
+    "renamePlaceholder": "p. ej., Dra. Chen — seguimiento",
+    "troubleshoot": {
+      "postgrest": "PostgREST aún no ha detectado visit_prep_summaries. Prueba en este orden:\n1) Supabase Dashboard → SQL → ejecuta supabase/migrations/20260421140000_visit_prep_summaries.sql\n2) Espera ~1 minuto y desliza hacia abajo para actualizar\n3) Si sigue fallando: Dashboard → Project Settings → General → Pausar proyecto y Reanudar",
+      "missingRelation": "Añade la tabla visit_prep_summaries a tu base de Supabase (ver .claude/schema.sql) e inténtalo de nuevo."
+    }
+  },
+  "medications": {
+    "detail": {
+      "prescribedBy": "Recetado por",
+      "notLinked": "Sin vincular",
+      "openDoctorsHint": "Abre Médicos para vincular este medicamento",
+      "openDoctorsA11y": "Recetado por: sin vincular. Abre Médicos para vincular.",
+      "prescriberFallbackName": "Médico"
     }
   }
 }

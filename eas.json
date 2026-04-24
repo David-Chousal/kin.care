@@ -9,10 +9,18 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "preview",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "production",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false"
+      }
     }
   },
   "submit": {
